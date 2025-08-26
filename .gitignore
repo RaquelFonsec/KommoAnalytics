@@ -1,0 +1,116 @@
+# KOMMO ANALYTICS - GITIGNORE
+# Arquivo para ignorar arquivos desnecessários no controle de versão
+
+# =====================================
+# ARQUIVOS SENSÍVEIS
+# =====================================
+.env
+.env.local
+.env.production
+*.key
+*.pem
+*.crt
+
+# =====================================
+# PYTHON
+# =====================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# =====================================
+# AMBIENTE VIRTUAL
+# =====================================
+dashboard_env/
+venv/
+ENV/
+env/
+.venv/
+
+# =====================================
+# LOGS E TEMPORÁRIOS
+# =====================================
+LOGS/*.log
+LOGS/*.txt
+# Relatórios (removido - não mais necessário)
+*.log
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+
+# =====================================
+# DADOS E EXPORTS
+# =====================================
+DATA/exports/*.json
+DATA/exports/*.csv
+DATA/exports/*.xlsx
+ETL/DATA/exports/*.json
+
+# =====================================
+# SISTEMA OPERACIONAL
+# =====================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =====================================
+# EDITORES
+# =====================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# =====================================
+# JUPYTER NOTEBOOK
+# =====================================
+.ipynb_checkpoints
+
+# =====================================
+# CACHE
+# =====================================
+.cache/
+.pytest_cache/
+.coverage
+
+# =====================================
+# STREAMLIT
+# =====================================
+.streamlit/secrets.toml
+
+# =====================================
+# MYSQL
+# =====================================
+*.sql~
+
+# =====================================
+# MANTER ESTRUTURA DE DIRETÓRIOS
+# =====================================
+!LOGS/.gitkeep
+# Relatórios (removido - não mais necessário)
+!DATA/exports/.gitkeep
