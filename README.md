@@ -374,22 +374,12 @@ python AUTOMATION/monitor_daily_updates.py
 - **Issues**: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
 - ** Email**: raquel.promptia@gmail.com
 
-### 📋 **FAQ Frequente**
-
-**Q: Como configurar a API do Kommo?**
-A: Siga o guia de configuração em `DOCS/api_setup.md`
-
-**Q: O dashboard não carrega, o que fazer?**
-A: Execute `python AUTOMATION/health_check.sh` para diagnóstico
-
-**Q: Como adicionar novos KPIs?**
-A: Edite o arquivo `DASHBOARD/main_app.py` e adicione suas métricas
 
 ---
 
 
 
-**Desenvolvido c por Raquel Fonseca**
+**Desenvolvido  por Raquel Fonseca**
 
 [![GitHub stars](https://img.shields.io/github/stars/RaquelFonsec/KommoAnalytics?style=social)](https://github.com/RaquelFonsec/KommoAnalytics)
 [![GitHub forks](https://img.shields.io/github/forks/RaquelFonsec/KommoAnalytics?style=social)](https://github.com/RaquelFonsec/KommoAnalytics)
