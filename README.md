@@ -343,14 +343,12 @@ python AUTOMATION/monitor_daily_updates.py
 
 ---
 
-## 📞 Suporte
+##  Suporte
 
-### 🆘 **Canais de Suporte**
+###  **Canais de Suporte**
 
 - **🐛 Issues**: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
 - **📧 Email**: raquel.promptia@gmail.com
-- **📖 Documentação**: [Wiki do Projeto](https://github.com/RaquelFonsec/KommoAnalytics/wiki)
-- **💬 Comunidade**: [Discussions](https://github.com/RaquelFonsec/KommoAnalytics/discussions)
 
 ### 📋 **FAQ Frequente**
 
@@ -373,10 +371,5 @@ A: Edite o arquivo `DASHBOARD/main_app.py` e adicione suas métricas
 
 **Desenvolvido por por Raquel Fonseca**
 
-[![GitHub stars](https://img.shields.io/github/stars/RaquelFonsec/KommoAnalytics?style=social)](https://github.com/RaquelFonsec/KommoAnalytics)
-[![GitHub forks](https://img.shields.io/github/forks/RaquelFonsec/KommoAnalytics?style=social)](https://github.com/RaquelFonsec/KommoAnalytics)
-[![GitHub issues](https://img.shields.io/github/issues/RaquelFonsec/KommoAnalytics)](https://github.com/RaquelFonsec/KommoAnalytics/issues)
-
-**⭐ Se este projeto te ajudou, considere dar uma estrela no GitHub!**
 
 </div>
