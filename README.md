@@ -27,7 +27,7 @@ O **Kommo Analytics Dashboard** é uma solução de Business Intelligence que tr
 - ⚙️ **Automação Completa** - Cron jobs para atualizações automáticas
 - 📈 **Métricas Avançadas** - KPIs, funil de conversão e previsões
 - 🔍 **Validação de Qualidade** - Sistema de monitoramento e alertas
-  
+- 📱 **Design Responsivo** - Funciona em desktop e mobile
 
 ---
 
@@ -161,7 +161,7 @@ streamlit run DASHBOARD/main_app.py
 ### 📞 **Módulo 3: Atividades Comerciais**
 - **📞 Contatos realizados** por vendedor
 - **🗓️ Reuniões agendadas** e realizadas
-- **🔄 Follow-ups** e taxas de conclusão
+- **✅ Follow-ups** e taxas de conclusão
 - **📊 Performance de atividades** por tipo
 - **⏱️ Tempo médio** por atividade
 
@@ -203,7 +203,7 @@ streamlit run DASHBOARD/main_app.py
 | **Custo por Lead** | Custo médio de aquisição | `custo_total / total_leads` | < R$ 200 |
 | **ROI Marketing** | Retorno sobre investimento | `(receita - custo) / custo * 100` | > 300% |
 
-### 📊 **Métricas por Canal**
+### 📊 **Métricas por Canal** *(Exemplos de Benchmark)*
 
 | Canal | Leads | Conversão | Custo/Lead | ROI |
 |-------|-------|-----------|------------|-----|
@@ -212,7 +212,9 @@ streamlit run DASHBOARD/main_app.py
 | **Indicação** | 20% | 35% | R$ 50 | 400% |
 | **Outbound** | 10% | 15% | R$ 80 | 180% |
 
-### 👥 **Métricas por Vendedor**
+*💡 **Nota:** Valores acima são benchmarks de mercado. Seus dados reais serão exibidos no dashboard.*
+
+### 👥 **Métricas por Vendedor** *(Exemplos de Benchmark)*
 
 | Vendedor | Leads | Vendas | Win Rate | Receita | Ticket Médio |
 |----------|-------|--------|----------|---------|--------------|
@@ -220,13 +222,35 @@ streamlit run DASHBOARD/main_app.py
 | **Vendedor B** | 120 | 36 | 30% | R$ 180.000 | R$ 5.000 |
 | **Vendedor C** | 100 | 25 | 25% | R$ 125.000 | R$ 5.000 |
 
-### 📊 **Métricas de Crescimento**
+*💡 **Nota:** Valores acima são exemplos. Seus dados reais de vendedores serão exibidos no dashboard.*
+
+### 📊 **Métricas de Crescimento** *(Exemplos de Benchmark)*
 
 | Período | Leads | Crescimento | Vendas | Crescimento | Receita | Crescimento |
 |---------|-------|-------------|--------|-------------|---------|-------------|
 | **Mês 1** | 1.000 | - | 250 | - | R$ 1.250.000 | - |
 | **Mês 2** | 1.200 | +20% | 300 | +20% | R$ 1.500.000 | +20% |
 | **Mês 3** | 1.440 | +20% | 360 | +20% | R$ 1.800.000 | +20% |
+
+*💡 **Nota:** Valores acima são exemplos de crescimento saudável. Seus dados reais de crescimento serão calculados automaticamente.*
+
+### 🎯 **Como Ver Suas Métricas Reais:**
+
+1. **Execute o dashboard:** `streamlit run DASHBOARD/main_app.py`
+2. **Acesse:** http://localhost:8501
+3. **Visualize:** Todos os 6 módulos com dados reais do seu Kommo CRM
+4. **Analise:** KPIs, funil de conversão, performance de vendedores e previsões
+
+### 📈 **Métricas Reais Disponíveis no Dashboard:**
+
+- ✅ **Total de leads** recebidos no período selecionado
+- ✅ **Win rate** real baseado em vendas ganhas/perdidas
+- ✅ **Ticket médio** calculado a partir de vendas fechadas
+- ✅ **Tempo de resposta** médio por canal
+- ✅ **Taxa de conclusão** de atividades comerciais
+- ✅ **Performance por vendedor** com dados reais
+- ✅ **Análise de canais** com conversão real
+- ✅ **Previsões** baseadas em dados históricos
 
 ---
 
@@ -345,10 +369,10 @@ python AUTOMATION/monitor_daily_updates.py
 
 ##  Suporte
 
-###  **Canais de Suporte**
+### 🆘 **Canais de Suporte**
 
-- **🐛 Issues**: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
-- **📧 Email**: raquel.promptia@gmail.com
+- **Issues**: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
+- ** Email**: raquel.promptia@gmail.com
 
 ### 📋 **FAQ Frequente**
 
@@ -365,11 +389,11 @@ A: Edite o arquivo `DASHBOARD/main_app.py` e adicione suas métricas
 
 
 
----
+**Desenvolvido c por Raquel Fonseca**
 
-<div align="center">
-
-**Desenvolvido por por Raquel Fonseca**
+[![GitHub stars](https://img.shields.io/github/stars/RaquelFonsec/KommoAnalytics?style=social)](https://github.com/RaquelFonsec/KommoAnalytics)
+[![GitHub forks](https://img.shields.io/github/forks/RaquelFonsec/KommoAnalytics?style=social)](https://github.com/RaquelFonsec/KommoAnalytics)
+[![GitHub issues](https://img.shields.io/github/issues/RaquelFonsec/KommoAnalytics)](https://github.com/RaquelFonsec/KommoAnalytics/issues)
 
 
 </div>
