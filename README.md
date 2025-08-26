@@ -240,7 +240,7 @@ python AUTOMATION/validate_metrics.py
 ##  Suporte
 
 - **Issues**: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
-- **Email**: raquel.fonseca@example.com
+- **Email**: raquel.promptia@gmail.com
 - **Documentação**: [Wiki do Projeto](https://github.com/RaquelFonsec/KommoAnalytics/wiki)
 
 
