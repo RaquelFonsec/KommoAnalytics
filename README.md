@@ -57,7 +57,7 @@ KommoAnalytics/
 
 ---
 
-## 🚀 Instalação
+##  Instalação
 
 ### Pré-requisitos
 
@@ -144,47 +144,47 @@ streamlit run DASHBOARD/main_app.py
 
 ## 📊 Módulos do Dashboard
 
-### 🎯 **Módulo 1: Entrada e Origem de Leads**
-- **📈 Total de leads** recebidos no período
-- **🌐 Distribuição por canal** de origem (orgânico, pago, indicação)
-- **⏱️ Tempo médio de resposta** ao lead
-- **💰 Custo por lead** por canal de origem
-- **📊 Análise de UTMs** e campanhas
+###  **Módulo 1: Entrada e Origem de Leads**
+- ** Total de leads** recebidos no período
+- ** Distribuição por canal** de origem (orgânico, pago, indicação)
+- ** Tempo médio de resposta** ao lead
+- ** Custo por lead** por canal de origem
+- ** Análise de UTMs** e campanhas
 
-### 🔄 **Módulo 2: Funil de Conversão**
-- **📊 Conversão por etapa** do funil de vendas
-- **⏰ Tempo médio** em cada etapa
-- **📉 Taxa de abandono** por etapa
-- **🔍 Análise de gargalos** no processo
-- **📈 Velocidade de conversão** por lead
+###  **Módulo 2: Funil de Conversão**
+- ** Conversão por etapa** do funil de vendas
+- ** Tempo médio** em cada etapa
+- ** Taxa de abandono** por etapa
+- ** Análise de gargalos** no processo
+- ** Velocidade de conversão** por lead
 
-### 📞 **Módulo 3: Atividades Comerciais**
-- **📞 Contatos realizados** por vendedor
-- **🗓️ Reuniões agendadas** e realizadas
-- **✅ Follow-ups** e taxas de conclusão
-- **📊 Performance de atividades** por tipo
-- **⏱️ Tempo médio** por atividade
+###  **Módulo 3: Atividades Comerciais**
+- ** Contatos realizados** por vendedor
+- ** Reuniões agendadas** e realizadas
+- ** Follow-ups** e taxas de conclusão
+- ** Performance de atividades** por tipo
+- ** Tempo médio** por atividade
 
-### 💰 **Módulo 4: Conversão e Receita**
-- **✅ Vendas fechadas** e perdidas
-- **💰 Receita total** e ticket médio
-- **📈 Win rate** por vendedor
-- **❌ Análise de motivos** de perda
-- **📊 Ciclo de vendas** médio
+###  **Módulo 4: Conversão e Receita**
+- ** Vendas fechadas** e perdidas
+- ** Receita total** e ticket médio
+- ** Win rate** por vendedor
+- ** Análise de motivos** de perda
+- ** Ciclo de vendas** médio
 
-### 👥 **Módulo 5: Performance por Pessoa e Canal**
-- **🏆 Ranking de vendedores** por receita
-- **📊 Performance por canal** de origem
-- **📈 Conversão por pessoa** e canal
-- **📋 Análise de produtividade** detalhada
-- **🎯 Metas vs realizado** por vendedor
+###  **Módulo 5: Performance por Pessoa e Canal**
+- ** Ranking de vendedores** por receita
+- ** Performance por canal** de origem
+- ** Conversão por pessoa** e canal
+- ** Análise de produtividade** detalhada
+- ** Metas vs realizado** por vendedor
 
-### 🎯 **Módulo 6: Previsibilidade (Forecast)**
-- **📊 Previsão de receita** baseada em dados históricos
-- **📈 Análise de gaps** vs metas estabelecidas
-- **⚠️ Alertas de risco** para metas
-- **💡 Recomendações de ações** para atingir metas
-- **📋 Análise de tendências** e sazonalidade
+###  **Módulo 6: Previsibilidade (Forecast)**
+- ** Previsão de receita** baseada em dados históricos
+- ** Análise de gaps** vs metas estabelecidas
+- ** Alertas de risco** para metas
+- ** Recomendações de ações** para atingir metas
+- ** Análise de tendências** e sazonalidade
 
 ---
 
@@ -212,7 +212,7 @@ streamlit run DASHBOARD/main_app.py
 | **Indicação** | 20% | 35% | R$ 50 | 400% |
 | **Outbound** | 10% | 15% | R$ 80 | 180% |
 
-*💡 **Nota:** Valores acima são benchmarks de mercado. Seus dados reais serão exibidos no dashboard.*
+* **Nota:** Valores acima são benchmarks de mercado. Seus dados reais serão exibidos no dashboard.*
 
 ### 👥 **Métricas por Vendedor** *(Exemplos de Benchmark)*
 
