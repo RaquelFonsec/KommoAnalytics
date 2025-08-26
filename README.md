@@ -27,7 +27,7 @@ O **Kommo Analytics Dashboard** é uma solução de Business Intelligence que tr
 - ⚙️ **Automação Completa** - Cron jobs para atualizações automáticas
 - 📈 **Métricas Avançadas** - KPIs, funil de conversão e previsões
 - 🔍 **Validação de Qualidade** - Sistema de monitoramento e alertas
-- 📱 **Design Responsivo** - Funciona em desktop e mobile
+  
 
 ---
 
