@@ -5,81 +5,105 @@ Sistema completo de ETL e Dashboard para análise de dados do Kommo CRM.
 ## 🚀 Instalação Rápida
 
 ```bash
-# 1. Criar estrutura de pastas
-python create_structure.py
+# 1. Clonar repositório
+git clone https://github.com/RaquelFonsec/KommoAnalytics.git
+cd KommoAnalytics
 
-# 2. Colocar seu código ETL
-# Cole seu arquivo kommo_etl.py em: ETL/kommo_etl.py
-
-# 3. Configurar credenciais
-cp .env.template .env
+# 2. Configurar credenciais
+cp env_template.txt .env
 # Edite o .env com suas credenciais
 
-# 4. Instalar dependências
-pip install -r SETUP/requirements.txt
+# 3. Instalar dependências
+pip install -r requirements.txt
 
-# 5. Configurar banco de dados
-mysql -u root -p < DATABASE/schema.sql
+# 4. Configurar banco de dados
+python DATABASE/setup_database.py
 
-# 6. Executar sistema
-python main.py
+# 5. Executar ETLs
+python ETL/kommo_etl_modulo1_leads.py
+python ETL/kommo_etl_modulo2_funil.py
+python ETL/kommo_etl_modulo3_atividades.py
+python ETL/kommo_etl_modulo4_conversao.py
+python ETL/kommo_etl_modulo5_performance.py
+python ETL/kommo_etl_modulo6_forecast_integrado.py
+
+# 6. Iniciar dashboard
+streamlit run DASHBOARD/main_app.py
 ```
 
 ## 📁 Estrutura do Projeto
 
 ```
-kommo-analytics/
-├── ETL/                    # Sistema ETL
-│   ├── kommo_etl.py       # 👈 SEU CÓDIGO AQUI
-│   └── config.py          # Configurações
+KommoAnalytics/
+├── ETL/                    # Sistema ETL (6 módulos)
+│   ├── kommo_etl_modulo1_leads.py
+│   ├── kommo_etl_modulo2_funil.py
+│   ├── kommo_etl_modulo3_atividades.py
+│   ├── kommo_etl_modulo4_conversao.py
+│   ├── kommo_etl_modulo5_performance.py
+│   └── kommo_etl_modulo6_forecast_integrado.py
 ├── DASHBOARD/              # Dashboard Streamlit
+│   └── main_app.py
 ├── DATABASE/               # Scripts SQL
+├── AUTOMATION/             # Scripts de automação
 ├── DATA/                   # Dados gerados
-└── main.py                # Script principal
+└── LOGS/                   # Logs do sistema
 ```
 
 ## 🎯 Como Usar
 
-### 1. Sincronizar Dados
+### 1. Executar ETLs
 ```bash
-python main.py
-# Escolha opção 1
+# Executar todos os ETLs
+bash AUTOMATION/run_all_etls.sh
+
+# Ou executar individualmente
+python ETL/kommo_etl_modulo1_leads.py
 ```
 
 ### 2. Ver Dashboard
 ```bash
-python main.py  
-# Escolha opção 2
+streamlit run DASHBOARD/main_app.py
 # Acesse: http://localhost:8501
 ```
 
-### 3. Modo Completo
+### 3. Automação
 ```bash
-python main.py
-# Escolha opção 3 (sincroniza + dashboard)
+# Configurar atualização automática
+bash AUTOMATION/setup_cron.sh
 ```
 
 ## 📊 Métricas Disponíveis
 
-- ✅ **Entrada de Leads**: Total, por canal, tempo resposta
-- ✅ **Funil de Vendas**: Conversão por etapa, tempo por etapa  
-- ✅ **Atividade Comercial**: Contatos, reuniões, follow-ups
-- ✅ **Receita**: Vendas fechadas, ticket médio, win rate
-- ✅ **Performance**: Rankings, análise por canal
-- ✅ **Forecast**: Pipeline atual, previsões
+- ✅ **Módulo 1 - Entrada de Leads**: Total, por canal, tempo resposta
+- ✅ **Módulo 2 - Funil de Vendas**: Conversão por etapa, tempo por etapa  
+- ✅ **Módulo 3 - Atividade Comercial**: Contatos, reuniões, follow-ups
+- ✅ **Módulo 4 - Receita**: Vendas fechadas, ticket médio, win rate
+- ✅ **Módulo 5 - Performance**: Rankings, análise por canal
+- ✅ **Módulo 6 - Forecast**: Pipeline atual, previsões
 
 ## 🔧 Configuração
 
 Edite o arquivo `.env` com suas credenciais:
 
 ```env
-KOMMO_API_KEY=sua_api_key_aqui
-KOMMO_ACCOUNT_ID=seu_account_id
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=kommo_analytics
 DB_PASSWORD=sua_senha_mysql
+DB_NAME=kommo_analytics
 ```
+
+## 🚀 Automação
+
+O sistema está configurado para:
+- ✅ **Atualização diária** às 6h
+- ✅ **Monitoramento contínuo** do dashboard
+- ✅ **Validação automática** de métricas
+- ✅ **Logs detalhados** de todas as operações
 
 ## 📞 Suporte
 
-- 📧 Email: suporte@empresa.com
-- 📖 Docs: ./DOCS/
-- 🐛 Issues: GitHub Issues
+- 📖 Documentação: ./DOCS/
+- 🐛 Issues: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
+- 📧 Contato: raquel.fonseca@example.com
