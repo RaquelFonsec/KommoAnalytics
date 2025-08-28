@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  kommo-analytics:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    restart: unless-stopped
+    volumes:
+      - ./LOGS:/app/LOGS
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

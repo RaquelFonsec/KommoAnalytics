@@ -188,8 +188,27 @@ class KommoForecastIntegradoETL:
             receita_por_dia = receita_real / dias_passados if dias_passados > 0 else 0
             previsao_receita_mes = receita_por_dia * dias_no_mes
             
-            # 3. Meta de Receita (baseada na performance atual + 15% de crescimento)
-            meta_receita = previsao_receita_mes * 1.15
+            # 3. Meta de Receita (ajustada baseada nos dias restantes e performance atual)
+            # Calcular meta mais realista baseada no tempo restante
+            receita_ja_realizada = receita_real
+            receita_media_diaria = receita_ja_realizada / dias_passados if dias_passados > 0 else 0
+            
+            # Calcular meta baseada na performance atual + crescimento realista
+            if dias_restantes <= 3:
+                # Últimos 3 dias: meta muito conservadora (2% de crescimento)
+                crescimento_meta = 1.02
+            elif dias_restantes <= 7:
+                # Última semana: meta conservadora (5% de crescimento)
+                crescimento_meta = 1.05
+            elif dias_restantes <= 14:
+                # Segunda semana: meta moderada (10% de crescimento)
+                crescimento_meta = 1.10
+            else:
+                # Início do mês: meta otimista (15% de crescimento)
+                crescimento_meta = 1.15
+            
+            # Meta = Receita já realizada + (receita média diária × dias restantes × crescimento)
+            meta_receita = receita_ja_realizada + (receita_media_diaria * dias_restantes * crescimento_meta)
             
             # 4. Previsão de Win Rate (baseada no Módulo 4)
             previsao_win_rate = win_rate_real  # Manter o win rate atual
@@ -235,7 +254,16 @@ class KommoForecastIntegradoETL:
             
             # Gaps
             gap_receita = forecast['meta_receita'] - receita_real
-            gap_leads = forecast['previsao_leads'] - leads_reais
+            
+            # Gap de leads ajustado para dias restantes (mais realista)
+            # Calcular leads necessários baseado no gap de receita, não na previsão total
+            vendas_necessarias = gap_receita / forecast['previsao_ticket_medio'] if forecast['previsao_ticket_medio'] > 0 else 0
+            win_rate_atual = win_rate_real
+            
+            # Leads necessários = vendas necessárias / win rate atual
+            leads_necessarios_total = vendas_necessarias / (win_rate_atual / 100) if win_rate_atual > 0 else 0
+            gap_leads = leads_necessarios_total  # Leads necessários para fechar o gap de receita
+            
             gap_win_rate = forecast['previsao_win_rate'] - win_rate_real
             gap_ticket_medio = forecast['previsao_ticket_medio'] - ticket_medio_real
             
