@@ -77,3 +77,5 @@ else
     monitor_log "🚨 CRÍTICO: Não foi possível reiniciar o dashboard após 3 tentativas"
     exit 1
 fi
+
+

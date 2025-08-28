@@ -82,7 +82,7 @@ fi
 sleep 30
 
 # Módulo 6: Previsibilidade (Forecast)
-if run_etl "Módulo 6 - Forecast" "kommo_etl_modulo6_forecasting.py"; then
+if run_etl "Módulo 6 - Forecast" "kommo_etl_modulo6_forecast_integrado.py"; then
     ((success_count++))
 fi
 
@@ -106,3 +106,4 @@ find "$LOG_DIR" -name "*.log" -type f -mtime +7 -delete
 
 # Enviar notificação (opcional)
 # curl -X POST "https://seu-webhook.com/notificacao" -d "ETLs executados: $success_count/$total_etls"
+

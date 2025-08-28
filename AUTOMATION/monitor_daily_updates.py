@@ -395,3 +395,5 @@ if __name__ == "__main__":
         print("\n⚠️ ALGUNS PROBLEMAS IDENTIFICADOS!")
         print("🔧 Verifique as recomendações acima para corrigir")
         print("📞 Entre em contato se precisar de ajuda")
+
+

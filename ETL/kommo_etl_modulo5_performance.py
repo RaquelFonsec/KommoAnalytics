@@ -387,9 +387,10 @@ class KommoPerformanceETL:
             
             created_date = datetime.now().date()
             
-            # Limpar dados existentes do período
-            cursor.execute("DELETE FROM performance_vendedores WHERE created_date = %s", (created_date,))
-            cursor.execute("DELETE FROM performance_canais WHERE created_date = %s", (created_date,))
+            # Limpar dados existentes dos últimos 30 dias
+            start_date = (datetime.now() - timedelta(days=30)).date()
+            cursor.execute("DELETE FROM performance_vendedores WHERE created_date >= %s", (start_date,))
+            cursor.execute("DELETE FROM performance_canais WHERE created_date >= %s", (start_date,))
             
             # Inserir dados de vendedores
             vendedores_insert = """

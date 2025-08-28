@@ -86,3 +86,5 @@ if [ "$error_count" -gt 0 ] || [ "$disk_usage" -gt 90 ]; then
 else
     exit 0
 fi
+
+

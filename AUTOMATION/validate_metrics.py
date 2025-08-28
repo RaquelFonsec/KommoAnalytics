@@ -477,3 +477,5 @@ if __name__ == "__main__":
     else:
         print("\n⚠️ ALGUMAS MÉTRICAS PRECISAM DE ATENÇÃO!")
         print("🔧 Verifique os problemas identificados acima")
+
+

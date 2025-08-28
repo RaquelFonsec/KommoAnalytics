@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 📊 Kommo Analytics Dashboard
 
 Sistema completo de ETL e Dashboard para análise de dados do Kommo CRM.
@@ -5,105 +6,139 @@ Sistema completo de ETL e Dashboard para análise de dados do Kommo CRM.
 ## 🚀 Instalação Rápida
 
 ```bash
-# 1. Clonar repositório
-git clone https://github.com/RaquelFonsec/KommoAnalytics.git
-cd KommoAnalytics
+# 1. Criar estrutura de pastas
+python create_structure.py
 
-# 2. Configurar credenciais
-cp env_template.txt .env
+# 2. Colocar seu código ETL
+# Cole seu arquivo kommo_etl.py em: ETL/kommo_etl.py
+
+# 3. Configurar credenciais
+cp .env.template .env
 # Edite o .env com suas credenciais
 
-# 3. Instalar dependências
-pip install -r requirements.txt
+# 4. Instalar dependências
+pip install -r SETUP/requirements.txt
 
-# 4. Configurar banco de dados
-python DATABASE/setup_database.py
+# 5. Configurar banco de dados
+mysql -u root -p < DATABASE/schema.sql
 
-# 5. Executar ETLs
-python ETL/kommo_etl_modulo1_leads.py
-python ETL/kommo_etl_modulo2_funil.py
-python ETL/kommo_etl_modulo3_atividades.py
-python ETL/kommo_etl_modulo4_conversao.py
-python ETL/kommo_etl_modulo5_performance.py
-python ETL/kommo_etl_modulo6_forecast_integrado.py
-
-# 6. Iniciar dashboard
-streamlit run DASHBOARD/main_app.py
+# 6. Executar sistema
+python main.py
 ```
 
 ## 📁 Estrutura do Projeto
 
 ```
-KommoAnalytics/
-├── ETL/                    # Sistema ETL (6 módulos)
-│   ├── kommo_etl_modulo1_leads.py
-│   ├── kommo_etl_modulo2_funil.py
-│   ├── kommo_etl_modulo3_atividades.py
-│   ├── kommo_etl_modulo4_conversao.py
-│   ├── kommo_etl_modulo5_performance.py
-│   └── kommo_etl_modulo6_forecast_integrado.py
+kommo-analytics/
+├── ETL/                    # Sistema ETL
+│   ├── kommo_etl.py       # 👈 SEU CÓDIGO AQUI
+│   └── config.py          # Configurações
 ├── DASHBOARD/              # Dashboard Streamlit
-│   └── main_app.py
 ├── DATABASE/               # Scripts SQL
-├── AUTOMATION/             # Scripts de automação
 ├── DATA/                   # Dados gerados
-└── LOGS/                   # Logs do sistema
+└── main.py                # Script principal
 ```
 
 ## 🎯 Como Usar
 
-### 1. Executar ETLs
+### 1. Sincronizar Dados
 ```bash
-# Executar todos os ETLs
-bash AUTOMATION/run_all_etls.sh
-
-# Ou executar individualmente
-python ETL/kommo_etl_modulo1_leads.py
+python main.py
+# Escolha opção 1
 ```
 
 ### 2. Ver Dashboard
 ```bash
-streamlit run DASHBOARD/main_app.py
+python main.py  
+# Escolha opção 2
 # Acesse: http://localhost:8501
 ```
 
-### 3. Automação
+### 3. Modo Completo
 ```bash
-# Configurar atualização automática
-bash AUTOMATION/setup_cron.sh
+python main.py
+# Escolha opção 3 (sincroniza + dashboard)
 ```
 
-## 📊 Métricas Disponíveis
+## 📈 Métricas Detalhadas
 
-- ✅ **Módulo 1 - Entrada de Leads**: Total, por canal, tempo resposta
-- ✅ **Módulo 2 - Funil de Vendas**: Conversão por etapa, tempo por etapa  
-- ✅ **Módulo 3 - Atividade Comercial**: Contatos, reuniões, follow-ups
-- ✅ **Módulo 4 - Receita**: Vendas fechadas, ticket médio, win rate
-- ✅ **Módulo 5 - Performance**: Rankings, análise por canal
-- ✅ **Módulo 6 - Forecast**: Pipeline atual, previsões
+### 🎯 **KPIs Principais**
+
+| Métrica | Descrição | Fórmula | Meta |
+|---------|-----------|---------|------|
+| **Total de Leads** | Leads recebidos no período | `COUNT(leads)` | Crescimento mensal |
+| **Win Rate** | Taxa de conversão de vendas | `vendas_ganhas / total_vendas * 100` | > 25% |
+| **Ticket Médio** | Valor médio por venda | `receita_total / vendas_ganhas` | > R$ 5.000 |
+| **Tempo de Resposta** | Tempo médio para responder leads | `AVG(response_time_hours)` | < 2 horas |
+| **Taxa de Conclusão** | Atividades concluídas | `atividades_concluidas / total_atividades * 100` | > 80% |
+| **Ciclo de Vendas** | Tempo médio do lead à venda | `AVG(sales_cycle_days)` | < 30 dias |
+| **Custo por Lead** | Custo médio de aquisição | `custo_total / total_leads` | < R$ 200 |
+| **ROI Marketing** | Retorno sobre investimento | `(receita - custo) / custo * 100` | > 300% |
+
+### 📊 **Métricas por Canal** *(Exemplos de Benchmark)*
+
+| Canal | Leads | Conversão | Custo/Lead | ROI |
+|-------|-------|-----------|------------|-----|
+| **Orgânico** | 45% | 28% | R$ 0 | ∞ |
+| **Pago** | 25% | 22% | R$ 150 | 250% |
+| **Indicação** | 20% | 35% | R$ 50 | 400% |
+| **Outbound** | 10% | 15% | R$ 80 | 180% |
+
+*💡 **Nota:** Valores acima são benchmarks de mercado. Seus dados reais serão exibidos no dashboard.*
+
+### 👥 **Métricas por Vendedor** *(Exemplos de Benchmark)*
+
+| Vendedor | Leads | Vendas | Win Rate | Receita | Ticket Médio |
+|----------|-------|--------|----------|---------|--------------|
+| **Vendedor A** | 150 | 45 | 30% | R$ 225.000 | R$ 5.000 |
+| **Vendedor B** | 120 | 36 | 30% | R$ 180.000 | R$ 5.000 |
+| **Vendedor C** | 100 | 25 | 25% | R$ 125.000 | R$ 5.000 |
+
+*💡 **Nota:** Valores acima são exemplos. Seus dados reais de vendedores serão exibidos no dashboard.*
+
+### 📊 **Métricas de Crescimento** *(Exemplos de Benchmark)*
+
+| Período | Leads | Crescimento | Vendas | Crescimento | Receita | Crescimento |
+|---------|-------|-------------|--------|-------------|---------|-------------|
+| **Mês 1** | 1.000 | - | 250 | - | R$ 1.250.000 | - |
+| **Mês 2** | 1.200 | +20% | 300 | +20% | R$ 1.500.000 | +20% |
+| **Mês 3** | 1.440 | +20% | 360 | +20% | R$ 1.800.000 | +20% |
+
+*💡 **Nota:** Valores acima são exemplos de crescimento saudável. Seus dados reais de crescimento serão calculados automaticamente.*
+
+### 🎯 **Como Ver Suas Métricas Reais:**
+
+1. **Execute o dashboard:** `streamlit run DASHBOARD/main_app.py`
+2. **Acesse:** http://localhost:8501
+3. **Visualize:** Todos os 6 módulos com dados reais do seu Kommo CRM
+4. **Analise:** KPIs, funil de conversão, performance de vendedores e previsões
+
+### 📈 **Métricas Reais Disponíveis no Dashboard:**
+
+- ✅ **Total de leads** recebidos no período selecionado
+- ✅ **Win rate** real baseado em vendas ganhas/perdidas
+- ✅ **Ticket médio** calculado a partir de vendas fechadas
+- ✅ **Tempo de resposta** médio por canal
+- ✅ **Taxa de conclusão** de atividades comerciais
+- ✅ **Performance por vendedor** com dados reais
+- ✅ **Análise de canais** com conversão real
+- ✅ **Previsões** baseadas em dados históricos
 
 ## 🔧 Configuração
 
 Edite o arquivo `.env` com suas credenciais:
 
 ```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=kommo_analytics
+KOMMO_API_KEY=sua_api_key_aqui
+KOMMO_ACCOUNT_ID=seu_account_id
 DB_PASSWORD=sua_senha_mysql
-DB_NAME=kommo_analytics
 ```
-
-## 🚀 Automação
-
-O sistema está configurado para:
-- ✅ **Atualização diária** às 6h
-- ✅ **Monitoramento contínuo** do dashboard
-- ✅ **Validação automática** de métricas
-- ✅ **Logs detalhados** de todas as operações
 
 ## 📞 Suporte
 
-- 📖 Documentação: ./DOCS/
-- 🐛 Issues: [GitHub Issues](https://github.com/RaquelFonsec/KommoAnalytics/issues)
-- 📧 Contato: raquel.fonseca@example.com
+- 📧 Email: suporte@empresa.com
+- 📖 Docs: ./DOCS/
+- 🐛 Issues: GitHub Issues
+=======
+# KommoAnalytics
+>>>>>>> abc062144b064fd89eba2e98b8de3788ce386ac2

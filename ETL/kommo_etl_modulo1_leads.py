@@ -474,7 +474,7 @@ class KommoLeadsETL:
         
         return 'Não Classificado'
 
-    def determine_primary_source_improved(self, source_info: Dict) -> str:
+ecut    def determine_primary_source_improved(self, source_info: Dict) -> str:
         """
         Versão melhorada da determinação de fonte primária
         """
