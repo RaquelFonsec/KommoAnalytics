@@ -751,10 +751,10 @@ SELECT
     user_name,
     user_role,
     COUNT(*) as total_atividades,
-    COUNT(CASE WHEN contact_type LIKE '%ligacao%' OR contact_type LIKE '%call%' THEN 1 END) as ligacoes,
-    COUNT(CASE WHEN contact_type LIKE '%email%' OR activity_type = 'email' THEN 1 END) as emails,
-    COUNT(CASE WHEN contact_type LIKE '%reuniao%' OR contact_type LIKE '%meeting%' THEN 1 END) as reunioes,
-    COUNT(CASE WHEN contact_type LIKE '%follow%' OR contact_type LIKE '%followup%' OR note_text LIKE '%FUP%' OR note_text LIKE '%ligar%' OR note_text LIKE '%contato%' OR note_text LIKE '%retorno%' THEN 1 END) as followups,
+    COUNT(CASE WHEN note_text LIKE '%FUP%' THEN 1 END) as followups,
+    COUNT(CASE WHEN note_text LIKE '%ligar%' OR note_text LIKE '%contato%' OR note_text LIKE '%retorno%' THEN 1 END) as contatos,
+    COUNT(CASE WHEN note_text LIKE '%reuniao%' OR note_text LIKE '%meeting%' THEN 1 END) as reunioes,
+    COUNT(CASE WHEN note_text LIKE '%email%' OR note_text LIKE '%e-mail%' THEN 1 END) as emails,
     COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) as concluidas,
     ROUND(COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
     COUNT(DISTINCT entity_id) as leads_diferentes
@@ -790,10 +790,10 @@ if not vendedores_df.empty:
         for _, vendedor in top_vendedores.iterrows():
             nome_vendedor = vendedor['user_name'][:15] + "..." if len(vendedor['user_name']) > 15 else vendedor['user_name']
             tipos_contato.extend([
-                {'Vendedor': nome_vendedor, 'Tipo': 'Ligações', 'Quantidade': vendedor['ligacoes']},
+                {'Vendedor': nome_vendedor, 'Tipo': 'Contatos', 'Quantidade': vendedor['contatos']},
+                {'Vendedor': nome_vendedor, 'Tipo': 'Follow-ups', 'Quantidade': vendedor['followups']},
                 {'Vendedor': nome_vendedor, 'Tipo': 'E-mails', 'Quantidade': vendedor['emails']},
-                {'Vendedor': nome_vendedor, 'Tipo': 'Reuniões', 'Quantidade': vendedor['reunioes']},
-                {'Vendedor': nome_vendedor, 'Tipo': 'Follow-ups', 'Quantidade': vendedor['followups']}
+                {'Vendedor': nome_vendedor, 'Tipo': 'Reuniões', 'Quantidade': vendedor['reunioes']}
             ])
         
         tipos_df = pd.DataFrame(tipos_contato)
@@ -819,7 +819,7 @@ if not vendedores_df.empty:
         'user_name': 'Vendedor',
         'user_role': 'Cargo',
         'total_atividades': 'Total Atividades',
-        'ligacoes': 'Ligações',
+        'contatos': 'Contatos',
         'emails': 'E-mails',
         'reunioes': 'Reuniões',
         'followups': 'Follow-ups',
@@ -1098,20 +1098,22 @@ performance_vendedores_query = f"""
 SELECT 
     user_name,
     user_role,
-    total_leads,
-    vendas_fechadas,
-    vendas_perdidas,
-    receita_total,
-    win_rate,
-    conversion_rate,
-    ticket_medio,
-    tempo_resposta_medio,
-    ciclo_vendas_medio,
-    total_atividades,
-    leads_contactados,
-    taxa_conclusao_atividades
+    SUM(total_leads) as total_leads,
+    SUM(vendas_fechadas) as vendas_fechadas,
+    SUM(vendas_perdidas) as vendas_perdidas,
+    SUM(receita_total) as receita_total,
+    AVG(win_rate) as win_rate,
+    AVG(conversion_rate) as conversion_rate,
+    AVG(ticket_medio) as ticket_medio,
+    AVG(tempo_resposta_medio) as tempo_resposta_medio,
+    AVG(ciclo_vendas_medio) as ciclo_vendas_medio,
+    SUM(total_atividades) as total_atividades,
+    SUM(atividades_concluidas) as atividades_concluidas,
+    SUM(leads_contactados) as leads_contactados,
+    AVG(taxa_conclusao_atividades) as taxa_conclusao_atividades
 FROM performance_vendedores 
 WHERE created_date >= '{data_inicio.date()}'
+GROUP BY user_name, user_role
 ORDER BY receita_total DESC
 """
 
@@ -1123,20 +1125,21 @@ SELECT
     canal_origem,
     utm_source,
     utm_medium,
-    total_leads,
-    vendas_fechadas,
-    vendas_perdidas,
-    receita_total,
-    custo_total,
-    win_rate,
-    conversion_rate,
-    ticket_medio,
-    custo_por_lead,
-    roi,
-    tempo_resposta_medio,
-    ciclo_vendas_medio
+    SUM(total_leads) as total_leads,
+    SUM(vendas_fechadas) as vendas_fechadas,
+    SUM(vendas_perdidas) as vendas_perdidas,
+    SUM(receita_total) as receita_total,
+    SUM(custo_total) as custo_total,
+    AVG(win_rate) as win_rate,
+    AVG(conversion_rate) as conversion_rate,
+    AVG(ticket_medio) as ticket_medio,
+    AVG(custo_por_lead) as custo_por_lead,
+    AVG(roi) as roi,
+    AVG(tempo_resposta_medio) as tempo_resposta_medio,
+    AVG(ciclo_vendas_medio) as ciclo_vendas_medio
 FROM performance_canais 
 WHERE created_date >= '{data_inicio.date()}'
+GROUP BY canal_origem, utm_source, utm_medium
 ORDER BY receita_total DESC
 """
 
@@ -1148,8 +1151,8 @@ col1, col2, col3, col4 = st.columns(4)
 if not performance_vendedores_df.empty and not performance_canais_df.empty:
     top_vendedor = performance_vendedores_df.iloc[0]
     top_canal = performance_canais_df.iloc[0]
-    total_vendedores = len(performance_vendedores_df)
-    total_canais = len(performance_canais_df)
+    total_vendedores = performance_vendedores_df['user_name'].nunique()
+    total_canais = performance_canais_df['canal_origem'].nunique()
     
     with col1:
         st.metric("👑 Top Vendedor", f"{top_vendedor['user_name'][:15]}", f"R$ {top_vendedor['receita_total']:,.0f}")
@@ -1189,6 +1192,19 @@ if not performance_vendedores_df.empty:
         if not vendedores_conversao.empty:
             fig_vendedores_conversao = px.bar(
                 vendedores_conversao, 
+                x='user_name', 
+                y='win_rate',
+                title="🎯 Ranking por Taxa de Conversão",
+                labels={'user_name': 'Vendedor', 'win_rate': 'Win Rate (%)'},
+                color='win_rate',
+                color_continuous_scale='RdYlGn'
+            )
+            fig_vendedores_conversao.update_xaxes(tickangle=45)
+            st.plotly_chart(fig_vendedores_conversao, use_container_width=True)
+        else:
+            # Mostrar todos os vendedores se não houver filtro
+            fig_vendedores_conversao = px.bar(
+                performance_vendedores_df.head(8), 
                 x='user_name', 
                 y='win_rate',
                 title="🎯 Ranking por Taxa de Conversão",

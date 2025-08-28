@@ -4,7 +4,7 @@
 # Data: $(date)
 
 # Configurações
-PROJECT_DIR="/home/raquel-fonseca/Projects/KommoAnalytics"
+PROJECT_DIR="/home/raquel-fonseca/KommoAnalytics"
 LOG_DIR="$PROJECT_DIR/LOGS"
 VENV_PATH="$PROJECT_DIR/dashboard_env"
 ETL_DIR="$PROJECT_DIR/ETL"
@@ -82,7 +82,7 @@ fi
 sleep 30
 
 # Módulo 6: Previsibilidade (Forecast)
-if run_etl "Módulo 6 - Forecast" "kommo_etl_modulo6_forecasting.py"; then
+if run_etl "Módulo 6 - Forecast" "kommo_etl_modulo6_forecast_integrado.py"; then
     ((success_count++))
 fi
 

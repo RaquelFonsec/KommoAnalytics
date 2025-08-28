@@ -985,7 +985,8 @@ class KommoActivityETL:
                         'created_date': datetime.fromtimestamp(task.get('created_at', 0)).date(),
                         'created_datetime': datetime.fromtimestamp(task.get('created_at', 0)),
                         'duration_seconds': None,
-                        'is_successful': bool(task.get('is_completed')),
+                        'is_successful': bool(task.get('is_successful', True)),
+                        'is_completed': bool(task.get('is_successful', True)),  # Usar is_successful como is_completed
                         'is_completed_on_time': is_completed_on_time,
                         'note_text': task.get('text', ''),
                         'complete_till': datetime.fromtimestamp(complete_till) if complete_till else None,
@@ -1016,6 +1017,7 @@ class KommoActivityETL:
                         'created_datetime': datetime.fromtimestamp(note.get('created_at', 0)),
                         'duration_seconds': None,
                         'is_successful': True,
+                        'is_completed': True,  # Notas são sempre consideradas completas
                         'note_text': note.get('params', {}).get('text', ''),
                         'source': 'notes_api',
                         'updated_at': datetime.now()
@@ -1043,6 +1045,7 @@ class KommoActivityETL:
                         'created_datetime': datetime.fromtimestamp(event.get('created_at', 0)),
                         'duration_seconds': None,
                         'is_successful': True,
+                        'is_completed': True,  # Eventos são sempre considerados completos
                         'note_text': str(event.get('value_after', '')),
                         'source': 'events_api',
                         'updated_at': datetime.now()
@@ -1066,6 +1069,7 @@ class KommoActivityETL:
                         'created_datetime': datetime.now(),
                         'duration_seconds': None,
                         'is_successful': metrics['response_rate'] > 0,
+                        'is_completed': metrics['response_rate'] > 0,  # Métricas de resposta são completas se há taxa > 0
                         'contacts_sent': metrics['contacts_sent'],
                         'responses_received': metrics['responses_received'],
                         'response_rate': metrics['response_rate'],
@@ -1161,13 +1165,14 @@ class KommoActivityETL:
             INSERT INTO commercial_activities (
                 activity_id, activity_type, contact_type, user_id, user_name,
                 entity_id, entity_type, created_date, created_datetime,
-                duration_seconds, is_successful, is_completed_on_time,
+                duration_seconds, is_successful, is_completed, is_completed_on_time,
                 note_text, complete_till, completed_at, contacts_sent,
                 responses_received, response_rate, avg_response_time_hours,
                 source, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 is_successful = VALUES(is_successful),
+                is_completed = VALUES(is_completed),
                 is_completed_on_time = VALUES(is_completed_on_time),
                 completed_at = VALUES(completed_at),
                 response_rate = VALUES(response_rate),
@@ -1188,6 +1193,7 @@ class KommoActivityETL:
                     row['created_datetime'],
                     int(row['duration_seconds']) if pd.notna(row['duration_seconds']) else None,
                     bool(row.get('is_successful', False)),
+                    bool(row.get('is_completed', False)),
                     bool(row.get('is_completed_on_time', False)),
                     str(row.get('note_text', ''))[:1000] if pd.notna(row.get('note_text')) else '',  # Limitar tamanho do texto
                     row.get('complete_till') if pd.notna(row.get('complete_till')) else None,

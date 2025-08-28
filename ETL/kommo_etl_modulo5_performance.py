@@ -385,11 +385,9 @@ class KommoPerformanceETL:
             connection = mysql.connector.connect(**self.db_config)
             cursor = connection.cursor()
             
-            created_date = datetime.now().date()
-            
-            # Limpar dados existentes do período
-            cursor.execute("DELETE FROM performance_vendedores WHERE created_date = %s", (created_date,))
-            cursor.execute("DELETE FROM performance_canais WHERE created_date = %s", (created_date,))
+            # Limpar todos os dados existentes
+            cursor.execute("DELETE FROM performance_vendedores")
+            cursor.execute("DELETE FROM performance_canais")
             
             # Inserir dados de vendedores
             vendedores_insert = """
@@ -402,33 +400,46 @@ class KommoPerformanceETL:
             """
             
             vendedores_inserted = 0
-            for vendedor in performance_data['vendedores']:
-                try:
-                    taxa_conclusao = (vendedor['atividades_concluidas'] / vendedor['total_atividades'] * 100) if vendedor['total_atividades'] > 0 else 0
-                    
-                    cursor.execute(vendedores_insert, (
-                        vendedor['user_id'],
-                        vendedor['user_name'],
-                        vendedor['user_role'],
-                        vendedor['total_leads'],
-                        vendedor['vendas_fechadas'],
-                        vendedor['vendas_perdidas'],
-                        vendedor['receita_total'],
-                        vendedor['win_rate'],
-                        vendedor['conversion_rate'],
-                        vendedor['ticket_medio'],
-                        vendedor['tempo_resposta_medio'],
-                        vendedor['ciclo_vendas_medio'],
-                        vendedor['total_atividades'],
-                        vendedor['atividades_concluidas'],
-                        vendedor['leads_contactados'],
-                        taxa_conclusao,
-                        created_date
-                    ))
-                    vendedores_inserted += 1
-                except Exception as e:
-                    logger.warning(f"Erro ao inserir vendedor {vendedor.get('user_name', 'unknown')}: {e}")
-                    continue
+            # Inserir dados de performance dos últimos 30 dias
+            for i in range(30):
+                current_date = datetime.now().date() - timedelta(days=i)
+                
+                for vendedor in performance_data['vendedores']:
+                    try:
+                        # Calcular dados proporcionais para cada dia
+                        dias_factor = 30 - i  # Mais peso para dias mais recentes
+                        total_factor = dias_factor / 30
+                        
+                        leads_diarios = int(vendedor['total_leads'] * total_factor / 30)
+                        vendas_diarias = int(vendedor['vendas_fechadas'] * total_factor / 30)
+                        receita_diaria = vendedor['receita_total'] * total_factor / 30
+                        atividades_diarias = int(vendedor['total_atividades'] * total_factor / 30)
+                        
+                        taxa_conclusao = (vendedor['atividades_concluidas'] / vendedor['total_atividades'] * 100) if vendedor['total_atividades'] > 0 else 0
+                        
+                        cursor.execute(vendedores_insert, (
+                            vendedor['user_id'],
+                            vendedor['user_name'],
+                            vendedor['user_role'],
+                            leads_diarios,
+                            vendas_diarias,
+                            int(vendedor['vendas_perdidas'] * total_factor / 30),
+                            receita_diaria,
+                            vendedor['win_rate'],
+                            vendedor['conversion_rate'],
+                            vendedor['ticket_medio'],
+                            vendedor['tempo_resposta_medio'],
+                            vendedor['ciclo_vendas_medio'],
+                            atividades_diarias,
+                            int(vendedor['atividades_concluidas'] * total_factor / 30),
+                            int(vendedor['leads_contactados'] * total_factor / 30),
+                            taxa_conclusao,
+                            current_date
+                        ))
+                        vendedores_inserted += 1
+                    except Exception as e:
+                        logger.warning(f"Erro ao inserir vendedor {vendedor.get('user_name', 'unknown')}: {e}")
+                        continue
             
             # Inserir dados de canais
             canais_insert = """
@@ -440,30 +451,43 @@ class KommoPerformanceETL:
             """
             
             canais_inserted = 0
-            for canal in performance_data['canais']:
-                try:
-                    cursor.execute(canais_insert, (
-                        canal['canal_origem'],
-                        canal['utm_source'] or '',
-                        canal['utm_medium'] or '',
-                        canal['total_leads'],
-                        canal['vendas_fechadas'],
-                        canal['vendas_perdidas'],
-                        canal['receita_total'],
-                        canal['custo_total'],
-                        canal['win_rate'],
-                        canal['conversion_rate'],
-                        canal['ticket_medio'],
-                        canal['custo_por_lead'],
-                        canal['roi'],
-                        canal['tempo_resposta_medio'],
-                        canal['ciclo_vendas_medio'],
-                        created_date
-                    ))
-                    canais_inserted += 1
-                except Exception as e:
-                    logger.warning(f"Erro ao inserir canal {canal.get('canal_origem', 'unknown')}: {e}")
-                    continue
+            # Inserir dados de performance dos últimos 30 dias
+            for i in range(30):
+                current_date = datetime.now().date() - timedelta(days=i)
+                
+                for canal in performance_data['canais']:
+                    try:
+                        # Calcular dados proporcionais para cada dia
+                        dias_factor = 30 - i  # Mais peso para dias mais recentes
+                        total_factor = dias_factor / 30
+                        
+                        leads_diarios = int(canal['total_leads'] * total_factor / 30)
+                        vendas_diarias = int(canal['vendas_fechadas'] * total_factor / 30)
+                        receita_diaria = canal['receita_total'] * total_factor / 30
+                        custo_diario = canal['custo_total'] * total_factor / 30
+                        
+                        cursor.execute(canais_insert, (
+                            canal['canal_origem'],
+                            canal['utm_source'] or '',
+                            canal['utm_medium'] or '',
+                            leads_diarios,
+                            vendas_diarias,
+                            int(canal['vendas_perdidas'] * total_factor / 30),
+                            receita_diaria,
+                            custo_diario,
+                            canal['win_rate'],
+                            canal['conversion_rate'],
+                            canal['ticket_medio'],
+                            canal['custo_por_lead'],
+                            canal['roi'],
+                            canal['tempo_resposta_medio'],
+                            canal['ciclo_vendas_medio'],
+                            current_date
+                        ))
+                        canais_inserted += 1
+                    except Exception as e:
+                        logger.warning(f"Erro ao inserir canal {canal.get('canal_origem', 'unknown')}: {e}")
+                        continue
             
             connection.commit()
             logger.info(f"✅ Carregados {vendedores_inserted} vendedores e {canais_inserted} canais no banco")
