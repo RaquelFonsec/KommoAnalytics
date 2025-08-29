@@ -432,7 +432,7 @@ class KommoLeadsETL:
                 'detailed_source': 'Erro'
             }
 
-    # CORREÇÃO URGENTE - Adicione estes métodos ao seu ETL
+    
 
     def determine_primary_source(self, source_info: Dict) -> str:
         """
@@ -537,7 +537,8 @@ class KommoLeadsETL:
             else:
                 return 'Origem Não Especificada'
         
-        return 'Origem Desconhecida'
+        # 9. Se não tem pipeline, usar classificação genérica
+        return 'Origem Não Especificada'
 
     def determine_primary_source_improved(self, source_info: Dict) -> str:
         """
