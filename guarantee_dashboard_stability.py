@@ -104,7 +104,7 @@ def check_etl_processes():
         'ETL/kommo_etl_modulo1_leads.py',
         'ETL/kommo_etl_modulo2_funil.py',
         'ETL/kommo_etl_modulo3_atividades.py',
-        'ETL/kommo_etl_modulo4_vendas.py',
+        'ETL/kommo_etl_modulo4_conversao.py',
         'ETL/kommo_etl_modulo5_performance.py',
         'ETL/kommo_etl_modulo6_forecast_integrado.py'
     ]
