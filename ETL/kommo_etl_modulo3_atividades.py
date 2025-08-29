@@ -800,6 +800,7 @@ class KommoActivityETL:
             elif activity_type == 'task':
                 task_type = activity_data.get('task_type')
                 text = activity_data.get('text', '').lower()
+                note_text = activity_data.get('note_text', '').lower()
                 
                 # Classificar baseado no tipo de tarefa (task_type)
                 if task_type == 1:  # Reunião
@@ -809,17 +810,27 @@ class KommoActivityETL:
                 elif task_type == 3:  # E-mail
                     return 'email'
                 elif task_type == 4:  # Tarefa
-                    return 'tarefa'
+                    # Verificar se é follow-up baseado no texto
+                    followup_keywords = [
+                        'fup', 'follow', 'acompanhar', 'retorno', 'retornar',
+                        'abordar', 'apresentação', 'ligação', 'ligar', 'contato',
+                        'acompanhamento', 'retornar contato', 'retornar ligação',
+                        'fazer contato', 'entrar em contato', 'prospeção'
+                    ]
+                    if any(keyword in text or keyword in note_text for keyword in followup_keywords):
+                        return 'followup'
+                    else:
+                        return 'tarefa'
                 elif task_type == 5:  # Follow-up
                     return 'followup'
                 # Se não tem task_type, tentar classificar pelo texto
-                elif 'reunião' in text or 'meeting' in text:
+                elif 'reunião' in text or 'meeting' in text or 'reunião' in note_text or 'meeting' in note_text:
                     return 'reuniao_agendada'
-                elif 'ligar' in text or 'call' in text:
+                elif 'ligar' in text or 'call' in text or 'ligar' in note_text or 'call' in note_text:
                     return 'ligacao_agendada'
-                elif 'email' in text or 'e-mail' in text:
+                elif 'email' in text or 'e-mail' in text or 'email' in note_text or 'e-mail' in note_text:
                     return 'email'
-                elif 'follow' in text or 'acompanhar' in text:
+                elif any(keyword in text or keyword in note_text for keyword in ['fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar', 'apresentação', 'ligação', 'ligar', 'contato', 'acompanhamento', 'retornar contato', 'retornar ligação', 'fazer contato', 'entrar em contato', 'prospeção']):
                     return 'followup'
                 else:
                     return 'tarefa'

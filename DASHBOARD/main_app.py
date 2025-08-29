@@ -48,60 +48,11 @@ st.title(" Kommo Analytics Dashboard -")
 
 # Sidebar
 st.sidebar.title(" Filtros")
-periodo = st.sidebar.selectbox("Período:", ["7 dias", "15 dias", "30 dias", "60 dias"], index=2)  # 30 dias por padrão
+periodo = st.sidebar.selectbox("Período:", ["7 dias", "15 dias", "30 dias"], index=2)  # 30 dias por padrão
 dias = int(periodo.split()[0])
 data_inicio = datetime.now() - timedelta(days=dias)
 
-# Teste de conexão
-if st.sidebar.button(" Testar Conexão"):
-    conn = init_connection()
-    if conn:
-        st.sidebar.success(" Conexão com MySQL OK!")
-        conn.close()
-    else:
-        st.sidebar.error(" Erro na conexão")
-
-# SEÇÃO 1: RESUMO EXECUTIVO
-st.header(" Resumo Executivo")
-
-col1, col2, col3, col4 = st.columns(4)
-
-# KPIs principais
-kpis_query = f"""
-SELECT 
-    COUNT(DISTINCT l.lead_id) as total_leads,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda ganha' THEN fh.lead_id END) as vendas,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda perdida' THEN fh.lead_id END) as vendas_perdidas,
-    COALESCE(AVG(l.response_time_hours), 0) as tempo_resposta_medio,
-    COALESCE(SUM(l.lead_cost), 0) as custo_total,
-    COALESCE(SUM(CASE WHEN fh.status_name = 'Venda ganha' THEN sm.sale_price ELSE 0 END), 0) as receita_total
-FROM leads_metrics l
-LEFT JOIN funnel_history fh ON l.lead_id = fh.lead_id AND fh.pipeline_id = 11146887
-LEFT JOIN sales_metrics sm ON l.lead_id = sm.lead_id
-WHERE l.created_date >= '{data_inicio.date()}'
-"""
-
-kpis_df = run_query(kpis_query)
-
-if not kpis_df.empty:
-    kpi = kpis_df.iloc[0]
-    
-    with col1:
-        st.metric("📈 Total Leads", f"{kpi['total_leads']:,}")
-    with col2:
-        win_rate = (kpi['vendas'] / kpi['total_leads'] * 100) if kpi['total_leads'] > 0 else 0
-        st.metric("🎯 Vendas Ganhas", f"{kpi['vendas']:,}", f"{win_rate:.1f}% win rate")
-    with col3:
-        loss_rate = (kpi['vendas_perdidas'] / kpi['total_leads'] * 100) if kpi['total_leads'] > 0 else 0
-        st.metric("❌ Vendas Perdidas", f"{kpi['vendas_perdidas']:,}", f"{loss_rate:.1f}% loss rate")
-    with col4:
-        # Calcular ROI Marketing
-        receita = kpi['receita_total']
-        custo = kpi['custo_total']
-        roi_marketing = ((receita - custo) / custo * 100) if custo > 0 else 0
-        st.metric("💰 ROI Marketing", f"{roi_marketing:.0f}%", f"R$ {receita:,.0f} receita")
-
-# SEÇÃO 2: MÓDULO 1 - ENTRADA E ORIGEM DE LEADS
+# SEÇÃO 1: MÓDULO 1 - ENTRADA E ORIGEM DE LEADS
 st.header("🎯 Módulo 1: Entrada e Origem de Leads")
 st.markdown("**Para saber de onde vêm os resultados e priorizar canais que convertem mais**")
 
@@ -352,33 +303,30 @@ if not utms_df.empty:
         st.plotly_chart(fig_utm_source, use_container_width=True)
     
     with col2:
-        # Top campanhas
-        utm_campaign_df = utms_df.groupby('utm_campaign')['total_leads'].sum().reset_index().sort_values('total_leads', ascending=False).head(5)
-        fig_utm_campaign = px.bar(
-            utm_campaign_df, 
-            x='utm_campaign', 
-            y='total_leads',
-            title="Top 5 Campanhas"
+        # Top UTMs por medium
+        utm_medium_df = utms_df.groupby('utm_medium')['total_leads'].sum().reset_index().sort_values('total_leads', ascending=False)
+        fig_utm_medium = px.pie(
+            utm_medium_df, 
+            values='total_leads', 
+            names='utm_medium',
+            title="Leads por UTM Medium"
         )
-        fig_utm_campaign.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_utm_campaign, use_container_width=True)
-    
-    # Tabela detalhada de UTMs
-    st.subheader("📋 Detalhamento de UTMs")
+        st.plotly_chart(fig_utm_medium, use_container_width=True)
+
+    # Tabela de UTMs
+    st.subheader("📋 Top 10 Combinações UTM")
     utms_display = utms_df.copy()
-    utms_display['pct_total'] = (utms_display['total_leads'] / utms_display['total_leads'].sum() * 100).round(1)
     utms_display = utms_display.rename(columns={
         'utm_source': 'UTM Source',
         'utm_medium': 'UTM Medium', 
         'utm_campaign': 'UTM Campaign',
-        'total_leads': 'Total Leads',
-        'pct_total': '% do Total'
+        'total_leads': 'Total Leads'
     })
     st.dataframe(utms_display, use_container_width=True)
 else:
-    st.info("Nenhum dado de UTM encontrado.")
+    st.info("Nenhum dado de UTM encontrado para o período selecionado.")
 
-# SEÇÃO 3: MÓDULO 2 - QUALIFICAÇÃO E AVANÇO NO FUNIL
+# SEÇÃO 2: MÓDULO 2 - QUALIFICAÇÃO E AVANÇO NO FUNIL
 st.header("🔄 Módulo 2: Qualificação e Avanço no Funil")
 st.markdown("**Para medir se o funil está saudável**")
 
@@ -505,7 +453,7 @@ with col4:
     vendas_perdidas_principal = status_principal_df[status_principal_df['status_name'] == 'Venda perdida']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Venda perdida' in status_principal_df['status_name'].values else 0
     st.metric("❌ Vendas Perdidas", f"{vendas_perdidas_principal:,}")
 
-# SEÇÃO 3.5: ANÁLISE DE VENDAS PERDIDAS
+# SEÇÃO 2.5: ANÁLISE DE VENDAS PERDIDAS
 st.header("❌ Análise de Vendas Perdidas")
 st.markdown("**Detalhamento das vendas perdidas no funil principal**")
 
@@ -587,7 +535,7 @@ with col4:
     tempo_medio_perdidas = comparacao_df[comparacao_df['status_name'] == 'Venda perdida']['tempo_medio'].iloc[0] if not comparacao_df.empty and 'Venda perdida' in comparacao_df['status_name'].values else 0
     st.metric("⏱️ Tempo até Perda", f"{tempo_medio_perdidas:.1f}h")
 
-# SEÇÃO 3.6: MOTIVOS DE PERDA
+# SEÇÃO 2.6: MOTIVOS DE PERDA
 st.header("🔍 Motivos de Perda")
 st.markdown("**Análise detalhada dos motivos de perda no funil**")
 
@@ -687,7 +635,7 @@ elif pct_com_motivo < 50:
 else:
     st.success("✅ **BOM CONTROLE**: {:.1f}% das vendas perdidas têm motivo registrado.".format(pct_com_motivo))
 
-# SEÇÃO 4: MÓDULO 3 - ATIVIDADES COMERCIAIS  
+# SEÇÃO 3: MÓDULO 3 - ATIVIDADES COMERCIAIS  
 st.header("📞 Módulo 3: Atividades Comerciais")
 st.markdown("**Para entender o esforço do time e avaliar cadência de prospecção**")
 
@@ -844,35 +792,9 @@ if not vendedores_df.empty:
     
     st.dataframe(vendedores_display, use_container_width=True)
 
-# Análise temporal
-st.subheader("📈 Atividades ao Longo do Tempo")
 
-temporal_query = f"""
-SELECT 
-    DATE(created_datetime) as data,
-    activity_type,
-    COUNT(*) as atividades
-FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
-GROUP BY DATE(created_datetime), activity_type
-ORDER BY data DESC
-LIMIT 50
-"""
 
-temporal_df = run_query(temporal_query)
-
-if not temporal_df.empty:
-    # Gráfico de linha temporal
-    fig_temporal = px.line(
-        temporal_df, 
-        x='data', 
-        y='atividades',
-        color='activity_type',
-        title="Atividades por Dia e Tipo"
-    )
-    st.plotly_chart(fig_temporal, use_container_width=True)
-
-# SEÇÃO 5: MÓDULO 4 - CONVERSÃO E RECEITA
+# SEÇÃO 4: MÓDULO 4 - CONVERSÃO E RECEITA
 st.header("💰 Módulo 4: Conversão e Receita")
 st.markdown("**Para medir resultados reais: vendas fechadas, receita, ticket médio e win rate**")
 
@@ -1097,7 +1019,7 @@ if not vendas_df.empty:
         else:
             st.success(f"✅ **BOM**: Ciclo de {ciclo_medio:.0f} dias")
 
-# SEÇÃO 6: MÓDULO 5 - PERFORMANCE POR PESSOA E CANAL
+# SEÇÃO 5: MÓDULO 5 - PERFORMANCE POR PESSOA E CANAL
 st.header("🏆 Módulo 5: Performance por Pessoa e Canal")
 st.markdown("**Para gestão e tomada de decisão: rankings de vendedores e análise de canais mais qualificados**")
 
@@ -1154,13 +1076,12 @@ ORDER BY receita_total DESC
 performance_canais_df = run_query(performance_canais_query)
 
 # Métricas principais do Módulo 5
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 if not performance_vendedores_df.empty and not performance_canais_df.empty:
     top_vendedor = performance_vendedores_df.iloc[0]
     top_canal = performance_canais_df.iloc[0]
     total_vendedores = performance_vendedores_df['user_name'].nunique()
-    total_canais = performance_canais_df['canal_origem'].nunique()
     
     with col1:
         st.metric("👑 Top Vendedor", f"{top_vendedor['user_name'][:15]}", f"R$ {top_vendedor['receita_total']:,.0f}")
@@ -1170,9 +1091,6 @@ if not performance_vendedores_df.empty and not performance_canais_df.empty:
     
     with col3:
         st.metric("👥 Vendedores", f"{total_vendedores}")
-    
-    with col4:
-        st.metric("📈 Canais", f"{total_canais}")
 
 # Performance de Vendedores
 st.subheader("👥 Ranking de Vendedores")
@@ -1369,7 +1287,7 @@ with col2:
         })
         st.dataframe(top_canais_display, use_container_width=True)
 
-# SEÇÃO 7: MÓDULO 6 - PREVISÕES E FORECASTING
+# SEÇÃO 6: MÓDULO 6 - PREVISÕES E FORECASTING
 st.header("🔮 Módulo 6: Previsões e Forecasting")
 st.markdown("**Análise preditiva e planejamento estratégico baseado em dados reais dos Módulos 1-5**")
 

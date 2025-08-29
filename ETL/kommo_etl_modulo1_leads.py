@@ -520,18 +520,26 @@ class KommoLeadsETL:
         # 8. Se não tem nenhuma informação, usar classificação baseada no pipeline
         if pipeline_id:
             # Classificação baseada no volume de leads por pipeline
-            if pipeline_id == 11146887:  # Pipeline principal
-                return 'Website Direto'  # Assumindo que é o canal principal
+            if pipeline_id == 11146887:  # Pipeline principal (maior volume)
+                return 'Website Direto'  # Canal principal - leads diretos
             elif pipeline_id == 11435023:  # Pipeline secundário
-                return 'Mídia Paga'  # Assumindo que é mídia paga
+                return 'Mídia Paga'  # Mídia paga
             elif pipeline_id == 11386583:  # Pipeline terciário
-                return 'Redes Sociais'  # Assumindo que é redes sociais
+                return 'Redes Sociais'  # Redes sociais
+            elif pipeline_id == 11724647:  # Pipeline de teste
+                return 'Teste'
+            elif pipeline_id == 11730455:  # Pipeline específico
+                return 'Landing Page'
+            elif pipeline_id == 11728567:  # Pipeline específico
+                return 'Formulário'
+            elif pipeline_id == 11643443:  # Pipeline específico
+                return 'Indicação'
             else:
                 return 'Origem Não Especificada'
         
         return 'Origem Desconhecida'
 
-ecut    def determine_primary_source_improved(self, source_info: Dict) -> str:
+    def determine_primary_source_improved(self, source_info: Dict) -> str:
         """
         Versão melhorada da determinação de fonte primária
         """
@@ -891,13 +899,13 @@ ecut    def determine_primary_source_improved(self, source_info: Dict) -> str:
         """
         # Mapeamento baseado nos IDs reais dos pipelines encontrados no banco
         pipeline_mapping = {
-            11146887: 'Funil Principal',  # Pipeline principal com 2130 leads
-            11435023: 'Funil Secundário', # Pipeline secundário com 362 leads
-            11386583: 'Funil Terciário',  # Pipeline terciário com 101 leads
-            11730455: 'Funil Especial',   # Pipeline especial com 10 leads
-            11724647: 'Funil Teste',      # Pipeline de teste com 9 leads
-            11643443: 'Funil Outro',      # Outro pipeline
-            11728567: 'Funil Outro'       # Outro pipeline
+            11146887: 'Website Direto',   # Pipeline principal - leads diretos
+            11435023: 'Mídia Paga',       # Pipeline secundário - mídia paga
+            11386583: 'Redes Sociais',    # Pipeline terciário - redes sociais
+            11730455: 'Landing Page',     # Pipeline especial - landing page
+            11724647: 'Teste',            # Pipeline de teste
+            11643443: 'Indicação',        # Outro pipeline - indicação
+            11728567: 'Formulário'        # Outro pipeline - formulário
         }
         
         return pipeline_mapping.get(pipeline_id, 'Pipeline Desconhecido')
