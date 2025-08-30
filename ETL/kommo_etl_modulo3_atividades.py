@@ -874,63 +874,39 @@ class KommoActivityETL:
                     return 'email'
                 elif task_type == 4:  # Tarefa
                     # Verificar se é follow-up baseado no texto - MELHORADO
-                    followup_keywords = [
-                    # Termos específicos de follow-up
-                    'fup', 'follow', 'acompanhar', 'retorno', 'retornar',
-                    'abordar', 'apresentação', 'ligação', 'ligar', 'contato',
-                    'acompanhamento', 'retornar contato', 'retornar ligação',
-                    'fazer contato', 'entrar em contato', 'prospeção',
-                    
-                    # Termos mais genéricos que podem indicar follow-up
-                    'verificar', 'checar', 'confirmar', 'validar', 'analisar',
-                    'revisar', 'acompanhar', 'monitorar', 'acompanhamento',
-                    'retorno', 'retornar', 'voltar', 'repetir', 'continuar',
-                    'próximo', 'seguinte', 'posterior', 'futuro', 'agendado',
-                    'marcado', 'programado', 'agenda', 'lembrete', 'lembrar',
-                    'lembrar de', 'não esquecer', 'importante', 'urgente',
-                    'prioridade', 'prioritário', 'crítico', 'essencial',
-                    
-                    # Termos de negócio que indicam follow-up
-                    'proposta', 'orçamento', 'cotação', 'demonstração',
-                    'apresentação', 'reunião', 'encontro', 'visita',
-                    'demonstrar', 'mostrar', 'explicar', 'esclarecer',
-                    'tirar dúvidas', 'dúvidas', 'perguntas', 'questionamentos',
-                    
-                    # Termos de vendas
-                    'venda', 'comercial', 'comprar', 'adquirir', 'contratar',
-                    'fechar', 'fechamento', 'negócio', 'negociação',
-                    'prospecção', 'prospectar', 'lead', 'cliente', 'cliente potencial',
-                    
-                    # Termos de comunicação
-                    'ligar', 'telefonar', 'chamar', 'contatar', 'entrar em contato',
-                    'falar com', 'conversar com', 'dialogar', 'comunicar',
-                    'informar', 'atualizar', 'atualização', 'status', 'situação',
-                    
-                    # Termos de tempo
-                    'hoje', 'amanhã', 'próxima semana', 'próximo mês',
-                    'semana que vem', 'mês que vem', 'futuro', 'depois',
-                    'posteriormente', 'em breve', 'logo', 'cedo', 'tarde',
-                    
-                    # Termos de ação
-                    'fazer', 'realizar', 'executar', 'implementar', 'aplicar',
-                    'desenvolver', 'criar', 'preparar', 'organizar', 'estruturar',
-                    'planejar', 'programar', 'agendar', 'marcar', 'definir'
-                ]
+                    # Palavras-chave fortes que indicam follow-up
+                    strong_followup_keywords = [
+                        'fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar',
+                        'dia', 'dias', 'semana', 'próximo', 'seguinte', 'retomar',
+                        'continuar', 'repetir', 'nova tentativa', 'tentar novamente',
+                        'lembrar', 'lembrete', 'agendar', 'marcar', 'verificar',
+                        'checar', 'confirmar', 'validar', 'atualizar', 'atualização',
+                        'proposta', 'orçamento', 'cotação', 'demonstração',
+                        'apresentação', 'reunião', 'encontro', 'visita',
+                        'venda', 'comercial', 'negócio', 'negociação',
+                        'prospecção', 'prospectar', 'cliente', 'cliente potencial'
+                    ]
                 
                     # Verificar se o texto contém palavras-chave de follow-up
                     text_lower = text.lower()
                     note_text_lower = note_text.lower()
                     
-                    # Contar quantas palavras-chave aparecem
-                    keyword_count = sum(1 for keyword in followup_keywords if keyword in text_lower or keyword in note_text_lower)
+                    # Palavras-chave fortes que indicam follow-up
+                    strong_followup_keywords = [
+                        'fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar',
+                        'dia', 'dias', 'semana', 'próximo', 'seguinte', 'retomar',
+                        'continuar', 'repetir', 'nova tentativa', 'tentar novamente',
+                        'lembrar', 'lembrete', 'agendar', 'marcar', 'verificar',
+                        'checar', 'confirmar', 'validar', 'atualizar', 'atualização',
+                        'proposta', 'orçamento', 'cotação', 'demonstração',
+                        'apresentação', 'reunião', 'encontro', 'visita',
+                        'venda', 'comercial', 'negócio', 'negociação',
+                        'prospecção', 'prospectar', 'cliente', 'cliente potencial'
+                    ]
                     
-                    # Se tem pelo menos 2 palavras-chave, é follow-up
-                    if keyword_count >= 2:
-                        fup_tipo = self._classify_followup_type(text, note_text)
-                        return f'followup_{fup_tipo}'
                     # Se tem pelo menos 1 palavra-chave forte, é follow-up
-                    elif any(strong_keyword in text_lower or strong_keyword in note_text_lower 
-                            for strong_keyword in ['fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar']):
+                    if any(strong_keyword in text_lower or strong_keyword in note_text_lower 
+                            for strong_keyword in strong_followup_keywords):
                         fup_tipo = self._classify_followup_type(text, note_text)
                         return f'followup_{fup_tipo}'
                     else:

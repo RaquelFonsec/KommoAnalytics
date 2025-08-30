@@ -913,26 +913,56 @@ class KommoLeadsETL:
 
     def calculate_response_time(self, lead: Dict, events: List[Dict]) -> Optional[float]:
         """
-        Calcular tempo de resposta em horas
+        Calcular tempo de resposta em horas - CORRIGIDO para usar atividades comerciais
         """
         try:
             lead_id = lead.get('id')
             lead_created = datetime.fromtimestamp(lead.get('created_at', 0))
             
-            # Buscar primeiro evento/nota relacionado ao lead
-            lead_events = [
-                event for event in events 
-                if event.get('entity_id') == lead_id and event.get('entity_type') == 'lead'
-            ]
-            
-            if lead_events:
-                # Ordenar por data de criação
-                lead_events.sort(key=lambda x: x.get('created_at', 0))
-                first_response = datetime.fromtimestamp(lead_events[0].get('created_at', 0))
+            # Buscar atividades comerciais do banco para este lead
+            try:
+                conn = mysql.connector.connect(**self.db_config)
+                cursor = conn.cursor()
                 
-                # Calcular diferença em horas
-                time_diff = (first_response - lead_created).total_seconds() / 3600
-                return round(time_diff, 2)
+                # Buscar primeira atividade para este lead
+                query = """
+                SELECT MIN(created_date) as primeira_atividade
+                FROM commercial_activities 
+                WHERE entity_id = %s 
+                AND entity_type = 'leads'
+                AND contact_type IN ('tarefa', 'ligacao_agendada', 'reuniao_agendada', 'email', 'nota')
+                """
+                
+                cursor.execute(query, (lead_id,))
+                result = cursor.fetchone()
+                
+                if result and result[0]:
+                    primeira_atividade = result[0]
+                    
+                    # Converter para datetime se for date
+                    from datetime import date
+                    if isinstance(primeira_atividade, date):
+                        primeira_atividade = datetime.combine(primeira_atividade, datetime.min.time())
+                    
+                    # Calcular diferença em horas
+                    time_diff = (primeira_atividade - lead_created).total_seconds() / 3600
+                    
+                    # VALIDAÇÃO: Tempo máximo realista (48 horas)
+                    if time_diff > 48:
+                        logger.warning(f"Tempo de resposta irrealista para lead {lead_id}: {time_diff:.1f}h - ignorando")
+                        cursor.close()
+                        conn.close()
+                        return None
+                    
+                    cursor.close()
+                    conn.close()
+                    return round(time_diff, 2)
+                
+                cursor.close()
+                conn.close()
+                
+            except Exception as db_error:
+                logger.warning(f"Erro ao buscar atividades do banco para lead {lead_id}: {db_error}")
             
             return None
             

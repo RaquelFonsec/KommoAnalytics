@@ -5,13 +5,50 @@ import mysql.connector
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, date
 import json
 import warnings
 warnings.filterwarnings('ignore')
 
 # Configuração da página
 st.set_page_config(page_title="Kommo Analytics", layout="wide")
+
+# Funções para verificação de status e solicitação de ETL
+def get_etl_status():
+    """Lê status da última execução dos ETLs"""
+    try:
+        status_file = "/home/raquel-fonseca/Projects/KommoAnalytics/LOGS/last_execution_status.txt"
+        
+        if not os.path.exists(status_file):
+            return "nunca_executado", None, None
+        
+        status_data = {}
+        with open(status_file, 'r') as f:
+            for line in f:
+                if '=' in line:
+                    key, value = line.strip().split('=', 1)
+                    status_data[key] = value
+        
+        timestamp = status_data.get('timestamp', 'Desconhecido')
+        success_count = int(status_data.get('success_count', 0))
+        total_etls = int(status_data.get('total_etls', 6))
+        status = status_data.get('status', 'UNKNOWN')
+        
+        return status, timestamp, f"{success_count}/{total_etls}"
+        
+    except Exception as e:
+        st.error(f"Erro ao ler status: {e}")
+        return "erro", None, None
+
+def request_kommo_etl():
+    """Solicita execução do ETL Kommo"""
+    try:
+        with open('/tmp/kommo_etl_requested.flag', 'w') as f:
+            f.write(f"{datetime.now().isoformat()}\nrequested_by_dashboard")
+        return True
+    except:
+        return False
 
 # Configuração do banco
 def init_connection():
@@ -44,7 +81,31 @@ def run_query(query, params=None):
         return pd.DataFrame()
 
 # Header
-st.title(" Kommo Analytics Dashboard -")
+st.title("📊 Kommo Analytics Dashboard")
+
+# Status do ETL
+status, last_run, success_ratio = get_etl_status()
+
+col1, col2, col3 = st.columns([2, 2, 1])
+
+with col1:
+    if status == "SUCCESS":
+        st.success(f"✅ ETL Completo: {success_ratio}")
+    elif status == "PARTIAL":
+        st.warning(f"⚠️ ETL Parcial: {success_ratio}")
+    else:
+        st.error("❌ ETL com Problemas")
+
+with col2:
+    if last_run:
+        st.info(f"🕐 Última execução: {last_run}")
+
+with col3:
+    if st.button("🔄 Solicitar ETL"):
+        if request_kommo_etl():
+            st.success("✅ ETL solicitado!")
+            time.sleep(2)
+            st.rerun()
 
 # Sidebar
 st.sidebar.title(" Filtros")
@@ -73,24 +134,15 @@ ORDER BY total_leads DESC
 leads_canal_df = run_query(leads_canal_query)
     
 # Métricas principais do Módulo 1
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     total_leads_modulo1 = leads_canal_df['total_leads'].sum() if not leads_canal_df.empty else 0
     st.metric("📊 Total Leads Recebidos", f"{total_leads_modulo1:,}")
 
 with col2:
-    # Calcular tempo médio apenas dos leads que têm tempo de resposta
-    if not leads_canal_df.empty:
-        leads_com_tempo = leads_canal_df[leads_canal_df['tempo_resposta_medio'] > 0]
-        if not leads_com_tempo.empty:
-            tempo_medio_resposta = leads_com_tempo['tempo_resposta_medio'].mean()
-            total_leads_com_tempo = leads_com_tempo['total_leads'].sum()
-            st.metric("⏱️ Tempo Médio Resposta", f"{tempo_medio_resposta:.1f}h", f"({total_leads_com_tempo} leads)")
-        else:
-            st.metric("⏱️ Tempo Médio Resposta", "N/A", "Sem dados")
-    else:
-        st.metric("⏱️ Tempo Médio Resposta", "N/A", "Sem dados")
+    tempo_medio_resposta = leads_canal_df['tempo_resposta_medio'].mean() if not leads_canal_df.empty else 0
+    st.metric("⏱️ Tempo Médio Resposta", f"{tempo_medio_resposta:.1f}h")
 
 with col3:
     custo_total_modulo1 = leads_canal_df['custo_total'].sum() if not leads_canal_df.empty else 0
@@ -99,15 +151,6 @@ with col3:
 with col4:
     custo_por_lead = custo_total_modulo1 / total_leads_modulo1 if total_leads_modulo1 > 0 else 0
     st.metric("🎯 Custo por Lead", f"R$ {custo_por_lead:.2f}")
-
-with col5:
-    # Contar leads com tempo de resposta
-    if not leads_canal_df.empty:
-        leads_com_tempo = leads_canal_df[leads_canal_df['tempo_resposta_medio'] > 0]['total_leads'].sum()
-        pct_com_tempo = (leads_com_tempo / total_leads_modulo1 * 100) if total_leads_modulo1 > 0 else 0
-        st.metric("📊 Leads com Tempo", f"{leads_com_tempo:,}", f"({pct_com_tempo:.1f}%)")
-    else:
-        st.metric("📊 Leads com Tempo", "0", "(0%)")
 
 col1, col2 = st.columns(2)
 
@@ -810,101 +853,66 @@ if not vendedores_df.empty:
     
     st.dataframe(vendedores_display, use_container_width=True)
 
-# Análise de Follow-ups Segmentados
-st.subheader("📊 Análise de Follow-ups por Tipo")
+# Análise de Follow-ups
+st.subheader("📊 Segmentação de Follow-ups")
 
-# Buscar dados de follow-ups segmentados
-followups_segmentados_query = f"""
+followups_query = f"""
 SELECT 
-    user_name,
     contact_type,
-    COUNT(*) as total
+    COUNT(*) as total_followups,
+    COUNT(CASE WHEN is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) as concluidos,
+    ROUND(COUNT(CASE WHEN is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
+    COUNT(DISTINCT user_id) as vendedores_unicos,
+    COUNT(DISTINCT entity_id) as leads_unicos
 FROM commercial_activities 
-WHERE contact_type LIKE 'followup_%' AND created_date >= '{data_inicio.date()}'
-GROUP BY user_name, contact_type
-ORDER BY user_name, total DESC
+WHERE created_date >= '{data_inicio.date()}'
+    AND contact_type LIKE '%follow%'
+GROUP BY contact_type 
+ORDER BY total_followups DESC
 """
 
-followups_segmentados_df = run_query(followups_segmentados_query)
+followups_df = run_query(followups_query)
 
-if not followups_segmentados_df.empty:
+if not followups_df.empty:
     col1, col2 = st.columns(2)
     
     with col1:
-        # Distribuição por tipo de follow-up
-        tipos_followup = followups_segmentados_df.groupby('contact_type')['total'].sum().reset_index()
-        tipos_followup['contact_type'] = tipos_followup['contact_type'].str.replace('followup_', '')
-        
-        # Mapear cores específicas para cada tipo
-        color_map = {
-            'generico': '#1f77b4',      # Azul - FUP genérico
-            'vendas': '#ff7f0e',        # Laranja - Vendas
-            'no_show': '#d62728',       # Vermelho - No show
-            'negocio': '#2ca02c',       # Verde - Negócio
-            'acompanhamento': '#9467bd', # Roxo - Acompanhamento
-            'tentativa': '#8c564b',     # Marrom - Tentativas
-            'outro': '#e377c2'          # Rosa - Outros
-        }
-        
-        fig_tipos_followup = px.pie(
-            tipos_followup,
-            values='total',
+        # Gráfico de follow-ups por tipo
+        fig_followups = px.pie(
+            followups_df, 
+            values='total_followups', 
             names='contact_type',
-            title="Distribuição de Follow-ups por Tipo",
-            color='contact_type',
-            color_discrete_map=color_map
+            title="Distribuição de Follow-ups por Tipo"
         )
-        st.plotly_chart(fig_tipos_followup, use_container_width=True)
+        st.plotly_chart(fig_followups, use_container_width=True)
     
     with col2:
-        # Follow-ups por vendedor
-        followups_vendedor = followups_segmentados_df.groupby('user_name')['total'].sum().reset_index()
-        followups_vendedor = followups_vendedor.sort_values('total', ascending=False).head(10)
-        
-        fig_followups_vendedor = px.bar(
-            followups_vendedor,
-            x='user_name',
-            y='total',
-            title="Top 10 Vendedores por Follow-ups",
-            labels={'user_name': 'Vendedor', 'total': 'Total Follow-ups'},
-            color='total',
-            color_continuous_scale='Blues'
+        # Taxa de conclusão por tipo
+        fig_conclusao_followups = px.bar(
+            followups_df, 
+            x='contact_type', 
+            y='taxa_conclusao',
+            title="Taxa de Conclusão por Tipo de Follow-up (%)",
+            labels={'contact_type': 'Tipo de Follow-up', 'taxa_conclusao': 'Taxa (%)'}
         )
-        fig_followups_vendedor.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_followups_vendedor, use_container_width=True)
+        fig_conclusao_followups.update_xaxes(tickangle=45)
+        st.plotly_chart(fig_conclusao_followups, use_container_width=True)
     
-    # Tabela detalhada de follow-ups por tipo e vendedor
-    st.subheader("📋 Detalhamento de Follow-ups por Tipo")
-    
-    followups_display = followups_segmentados_df.copy()
-    followups_display['contact_type'] = followups_display['contact_type'].str.replace('followup_', '')
+    # Tabela detalhada de follow-ups
+    st.subheader("📋 Detalhamento de Follow-ups")
+    followups_display = followups_df.copy()
     followups_display = followups_display.rename(columns={
-        'user_name': 'Vendedor',
         'contact_type': 'Tipo de Follow-up',
-        'total': 'Quantidade'
+        'total_followups': 'Total Follow-ups',
+        'concluidos': 'Concluídos',
+        'taxa_conclusao': 'Taxa Conclusão (%)',
+        'vendedores_unicos': 'Vendedores Únicos',
+        'leads_unicos': 'Leads Únicos'
     })
-    
     st.dataframe(followups_display, use_container_width=True)
-    
-    # Explicação dos tipos de follow-up
-    st.subheader("📝 Legenda dos Tipos de Follow-up")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        **🔵 Genérico**: FUP, follow up, contato básico
-        **🟠 Vendas**: Fechamento, negociação, lead qualificado
-        **🔴 No Show**: Cliente não compareceu
-        **🟢 Negócio**: Proposta, apresentação, demonstração
-        """)
-    
-    with col2:
-        st.markdown("""
-        **🟣 Acompanhamento**: Verificar, confirmar, monitorar
-        **🟤 Tentativa**: Tentativas numeradas (1º, 2º, 3º)
-        **🟡 Outro**: Categorias não identificadas
-        """)
+else:
+    st.info("Nenhum follow-up encontrado no período selecionado.")
+
 
 # SEÇÃO 4: MÓDULO 4 - CONVERSÃO E RECEITA
 st.header("💰 Módulo 4: Conversão e Receita")
@@ -916,10 +924,10 @@ SELECT
     status_name,
     status_type,
     COUNT(*) as total_leads,
-    SUM(CASE WHEN status_name = 'Venda ganha' THEN sale_price ELSE 0 END) as receita_total,
-    AVG(CASE WHEN status_name = 'Venda ganha' THEN sale_price END) as ticket_medio,
+    SUM(lead_value) as receita_total,
+    AVG(lead_value) as ticket_medio,
     AVG(sales_cycle_days) as ciclo_medio_dias
-FROM sales_metrics 
+FROM sales_conversions 
 WHERE created_date >= '{data_inicio.date()}'
 GROUP BY status_name, status_type
 ORDER BY total_leads DESC
@@ -929,34 +937,27 @@ vendas_df = run_query(vendas_query)
 
 # Métricas principais do Módulo 4
 if not vendas_df.empty:
-    vendas_ganhas = vendas_df[vendas_df['status_name'] == 'Venda ganha']
-    vendas_perdidas = vendas_df[vendas_df['status_name'] == 'Venda perdida']
+    vendas_ganhas = vendas_df[vendas_df['status_type'] == 'won']
+    vendas_perdidas = vendas_df[vendas_df['status_type'] == 'lost']
     
-    # Usar os dados corretos das linhas
-    total_vendas_fechadas = vendas_ganhas['total_leads'].iloc[0] if not vendas_ganhas.empty else 0
-    total_vendas_perdidas = vendas_perdidas['total_leads'].iloc[0] if not vendas_perdidas.empty else 0
-    receita_total = vendas_ganhas['receita_total'].iloc[0] if not vendas_ganhas.empty else 0
-    
-    # Calcular ticket médio apenas das vendas ganhas
-    if not vendas_ganhas.empty and vendas_ganhas['receita_total'].iloc[0] > 0:
-        ticket_medio = vendas_ganhas['receita_total'].iloc[0] / total_vendas_fechadas
-    else:
-        ticket_medio = 0
-        
+    total_vendas_fechadas = vendas_ganhas['total_leads'].sum() if not vendas_ganhas.empty else 0
+    total_vendas_perdidas = vendas_perdidas['total_leads'].sum() if not vendas_perdidas.empty else 0
+    receita_total = vendas_ganhas['receita_total'].sum() if not vendas_ganhas.empty else 0
+    ticket_medio = vendas_ganhas['ticket_medio'].mean() if not vendas_ganhas.empty else 0
     win_rate = (total_vendas_fechadas / (total_vendas_fechadas + total_vendas_perdidas) * 100) if (total_vendas_fechadas + total_vendas_perdidas) > 0 else 0
-    ciclo_medio = vendas_ganhas['ciclo_medio_dias'].iloc[0] if not vendas_ganhas.empty else 0
-
+    ciclo_medio = vendas_ganhas['ciclo_medio_dias'].mean() if not vendas_ganhas.empty else 0
+    
     col1, col2, col3, col4 = st.columns(4)
-
+    
     with col1:
         st.metric("✅ Vendas Fechadas", f"{total_vendas_fechadas:,}")
-
+    
     with col2:
         st.metric("💰 Receita Total", f"R$ {receita_total:,.2f}")
-
+    
     with col3:
         st.metric("🎫 Ticket Médio", f"R$ {ticket_medio:,.2f}")
-
+    
     with col4:
         st.metric("📈 Win Rate", f"{win_rate:.1f}%")
 
@@ -1065,7 +1066,52 @@ if not vendedores_vendas_df.empty:
     
     st.dataframe(vendedores_vendas_display, use_container_width=True)
 
+# Análise temporal de conversões
+st.subheader("📈 Conversões ao Longo do Tempo")
 
+conversoes_temporais_query = f"""
+SELECT 
+    DATE(closed_at) as data_fechamento,
+    COUNT(CASE WHEN status_name = 'Venda ganha' THEN 1 END) as vendas_fechadas,
+    COUNT(CASE WHEN status_name = 'Venda perdida' THEN 1 END) as vendas_perdidas,
+    SUM(CASE WHEN status_name = 'Venda ganha' THEN sale_price ELSE 0 END) as receita_diaria
+FROM sales_metrics 
+WHERE closed_at IS NOT NULL 
+AND created_date >= '{data_inicio.date()}'
+GROUP BY DATE(closed_at)
+ORDER BY data_fechamento DESC
+LIMIT 30
+"""
+
+conversoes_temporais_df = run_query(conversoes_temporais_query)
+
+if not conversoes_temporais_df.empty:
+    fig_temporal = go.Figure()
+    
+    fig_temporal.add_trace(go.Scatter(
+        x=conversoes_temporais_df['data_fechamento'],
+        y=conversoes_temporais_df['vendas_fechadas'],
+        mode='lines+markers',
+        name='Vendas Fechadas',
+        line=dict(color='green')
+    ))
+    
+    fig_temporal.add_trace(go.Scatter(
+        x=conversoes_temporais_df['data_fechamento'],
+        y=conversoes_temporais_df['vendas_perdidas'],
+        mode='lines+markers',
+        name='Vendas Perdidas',
+        line=dict(color='red')
+    ))
+    
+    fig_temporal.update_layout(
+        title="Conversões Diárias",
+        xaxis_title="Data",
+        yaxis_title="Quantidade",
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig_temporal, use_container_width=True)
 
 # Insights e alertas de conversão
 st.subheader("💡 Insights de Conversão")
@@ -1552,7 +1598,51 @@ if not forecast_df.empty and not gaps_df.empty:
             else:
                 st.success("✅ Meta de leads será atingida!")
 
+# Resumo Executivo do Forecast
+st.subheader("📋 Resumo Executivo")
 
+if not forecast_df.empty and not gaps_df.empty:
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.info(f"**Mês:** {forecast_df['mes_ano'].iloc[0]}")
+    
+    with col2:
+        st.info(f"**Win Rate Previsto:** {forecast_df['previsao_win_rate'].iloc[0]:.1f}%")
+    
+    with col3:
+        st.info(f"**Ticket Médio Previsto:** R$ {forecast_df['previsao_ticket_medio'].iloc[0]:,.0f}")
+    
+    with col4:
+        risco_meta = gaps_df['risco_meta'].iloc[0] if not gaps_df.empty else 'N/A'
+        if risco_meta == 'ALTO':
+            st.error(f"**Risco:** {risco_meta}")
+        elif risco_meta == 'MÉDIO':
+            st.warning(f"**Risco:** {risco_meta}")
+        else:
+            st.success(f"**Risco:** {risco_meta}")
+
+# Resumo Executivo do Mês
+st.subheader("📋 Resumo Executivo do Mês")
+
+if not forecast_df.empty and not gaps_df.empty:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**📊 Dados de Previsão:**")
+        st.info(f"**Mês:** {forecast_df['mes_ano'].iloc[0]}")
+        st.info(f"**Previsão de Leads:** {int(forecast_df['previsao_leads'].iloc[0]):,}")
+        st.info(f"**Previsão de Receita:** R$ {forecast_df['previsao_receita'].iloc[0]:,.0f}")
+        st.info(f"**Win Rate Previsto:** {forecast_df['previsao_win_rate'].iloc[0]:.1f}%")
+        st.info(f"**Ticket Médio Previsto:** R$ {forecast_df['previsao_ticket_medio'].iloc[0]:,.0f}")
+    
+    with col2:
+        st.markdown("**🎯 Análise de Metas:**")
+        st.info(f"**Meta de Receita:** R$ {forecast_df['meta_receita'].iloc[0]:,.0f}")
+        st.info(f"**Gap de Receita:** R$ {gaps_df['gap_receita'].iloc[0]:,.0f}")
+        st.info(f"**Gap de Leads:** {int(gaps_df['gap_leads'].iloc[0]):,}")
+        st.info(f"**Risco da Meta:** {gaps_df['risco_meta'].iloc[0]}")
+        st.info(f"**Receita/Dia Necessária:** R$ {gaps_df['receita_necessaria_diaria'].iloc[0]:,.0f}")
 
 # Alertas automáticos
 st.subheader("🚨 Alertas Automáticos")
@@ -1604,5 +1694,7 @@ if not gaps_df.empty:
     else:
         st.success("✅ **Tudo OK**: Nenhum alerta crítico detectado!")
     
-
-
+    # Exibir ações recomendadas
+    if acoes_db:
+        st.subheader("💡 Ações Recomendadas")
+        st.info(acoes_db)
