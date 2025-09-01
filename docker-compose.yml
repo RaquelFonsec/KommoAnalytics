@@ -1,21 +1,62 @@
 version: '3.8'
 
 services:
-  kommo-analytics:
-    build: .
-    ports:
-      - "8501:8501"
-    environment:
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: kommo_mysql
     restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: kommo_analytics
+      MYSQL_USER: kommo_analytics
+      MYSQL_PASSWORD: previdas_ltda_2025
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./create_database.sql:/docker-entrypoint-initdb.d/create_database.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - kommo_network
+
+  # Streamlit Application
+  streamlit:
+    build: .
+    container_name: kommo_streamlit
+    restart: unless-stopped
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=kommo_analytics
+      - DB_PASSWORD=previdas_ltda_2025
+      - DB_NAME=kommo_analytics
     volumes:
       - ./LOGS:/app/LOGS
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - ./.streamlit:/app/.streamlit
+    depends_on:
+      - mysql
+    networks:
+      - kommo_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: kommo_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - streamlit
+    networks:
+      - kommo_network
+
+volumes:
+  mysql_data:
+
+networks:
+  kommo_network:
+    driver: bridge
