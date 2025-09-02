@@ -769,6 +769,69 @@ class KommoActivityETL:
             logger.warning(f"Erro ao extrair eventos alternativo: {e}")
             return []
 
+    def _classify_followup_type(self, text: str, note_text: str) -> str:
+        """
+        Classificar o tipo específico de follow-up baseado no texto
+        """
+        text_lower = text.lower() if text else ''
+        note_text_lower = note_text.lower() if note_text else ''
+        
+        # SEGMENTAÇÃO MELHORADA POR TIPO DE ATIVIDADE
+        fup_comunicacao = [
+            'ligar', 'telefonar', 'chamar', 'contatar', 
+            'falar com', 'conversar com', 'dialogar', 'comunicar'
+        ]
+        
+        fup_negocio = [
+            'proposta', 'orçamento', 'cotação', 'demonstração',
+            'apresentação', 'reunião', 'encontro', 'visita',
+            'demonstrar', 'mostrar', 'explicar', 'esclarecer'
+        ]
+        
+        fup_vendas = [
+            'venda', 'comercial', 'comprar', 'adquirir', 'contratar',
+            'fechar', 'fechamento', 'negócio', 'negociação',
+            'prospecção', 'prospectar', 'lead', 'cliente'
+        ]
+        
+        fup_acompanhamento = [
+            'verificar', 'checar', 'confirmar', 'validar', 'analisar',
+            'revisar', 'monitorar', 'acompanhar', 'retorno', 'retornar'
+        ]
+        
+        fup_no_show = [
+            'no show', 'não compareceu', 'não apareceu', 'ausente',
+            'falta', 'cancelou', 'desmarcou'
+        ]
+        
+        fup_tentativa = [
+            'tentativa', 'tentativa de', '1º', '2º', '3º', '4º', '5º',
+            'primeira', 'segunda', 'terceira', 'quarta', 'quinta'
+        ]
+        
+        fup_generico = [
+            'fup', 'follow up', 'follow-up', 'followup', 'contato',
+            'entrar em contato', 'fazer contato'
+        ]
+        
+        # Verificar tipo de follow-up (ordem de prioridade)
+        if any(keyword in text_lower or keyword in note_text_lower for keyword in fup_no_show):
+            return 'no_show'
+        elif any(keyword in text_lower or keyword in note_text_lower for keyword in fup_tentativa):
+            return 'tentativa'
+        elif any(keyword in text_lower or keyword in note_text_lower for keyword in fup_comunicacao):
+            return 'comunicacao'
+        elif any(keyword in text_lower or keyword in note_text_lower for keyword in fup_negocio):
+            return 'negocio'
+        elif any(keyword in text_lower or keyword in note_text_lower for keyword in fup_vendas):
+            return 'vendas'
+        elif any(keyword in text_lower or keyword in note_text_lower for keyword in fup_acompanhamento):
+            return 'acompanhamento'
+        elif any(keyword in text_lower or keyword in note_text_lower for keyword in fup_generico):
+            return 'generico'
+        else:
+            return 'outro'
+
     def classify_contact_type(self, activity_data: Dict, activity_type: str) -> str:
         """
         Classificar tipo de contato baseado na atividade
@@ -800,6 +863,7 @@ class KommoActivityETL:
             elif activity_type == 'task':
                 task_type = activity_data.get('task_type')
                 text = activity_data.get('text', '').lower()
+                note_text = activity_data.get('note_text', '').lower()
                 
                 # Classificar baseado no tipo de tarefa (task_type)
                 if task_type == 1:  # Reunião
@@ -809,18 +873,59 @@ class KommoActivityETL:
                 elif task_type == 3:  # E-mail
                     return 'email'
                 elif task_type == 4:  # Tarefa
-                    return 'tarefa'
+                    # Verificar se é follow-up baseado no texto - MELHORADO
+                    # Palavras-chave fortes que indicam follow-up
+                    strong_followup_keywords = [
+                        'fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar',
+                        'dia', 'dias', 'semana', 'próximo', 'seguinte', 'retomar',
+                        'continuar', 'repetir', 'nova tentativa', 'tentar novamente',
+                        'lembrar', 'lembrete', 'agendar', 'marcar', 'verificar',
+                        'checar', 'confirmar', 'validar', 'atualizar', 'atualização',
+                        'proposta', 'orçamento', 'cotação', 'demonstração',
+                        'apresentação', 'reunião', 'encontro', 'visita',
+                        'venda', 'comercial', 'negócio', 'negociação',
+                        'prospecção', 'prospectar', 'cliente', 'cliente potencial'
+                    ]
+                
+                    # Verificar se o texto contém palavras-chave de follow-up
+                    text_lower = text.lower()
+                    note_text_lower = note_text.lower()
+                    
+                    # Palavras-chave fortes que indicam follow-up
+                    strong_followup_keywords = [
+                        'fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar',
+                        'dia', 'dias', 'semana', 'próximo', 'seguinte', 'retomar',
+                        'continuar', 'repetir', 'nova tentativa', 'tentar novamente',
+                        'lembrar', 'lembrete', 'agendar', 'marcar', 'verificar',
+                        'checar', 'confirmar', 'validar', 'atualizar', 'atualização',
+                        'proposta', 'orçamento', 'cotação', 'demonstração',
+                        'apresentação', 'reunião', 'encontro', 'visita',
+                        'venda', 'comercial', 'negócio', 'negociação',
+                        'prospecção', 'prospectar', 'cliente', 'cliente potencial'
+                    ]
+                    
+                    # Se tem pelo menos 1 palavra-chave forte, é follow-up
+                    if any(strong_keyword in text_lower or strong_keyword in note_text_lower 
+                            for strong_keyword in strong_followup_keywords):
+                        fup_tipo = self._classify_followup_type(text, note_text)
+                        return f'followup_{fup_tipo}'
+                    else:
+                        return 'tarefa'
                 elif task_type == 5:  # Follow-up
-                    return 'followup'
+                    # Aplicar a mesma lógica de segmentação para task_type 5
+                    fup_tipo = self._classify_followup_type(text, note_text)
+                    return f'followup_{fup_tipo}'
                 # Se não tem task_type, tentar classificar pelo texto
-                elif 'reunião' in text or 'meeting' in text:
+                elif 'reunião' in text or 'meeting' in text or 'reunião' in note_text or 'meeting' in note_text:
                     return 'reuniao_agendada'
-                elif 'ligar' in text or 'call' in text:
+                elif 'ligar' in text or 'call' in text or 'ligar' in note_text or 'call' in note_text:
                     return 'ligacao_agendada'
-                elif 'email' in text or 'e-mail' in text:
+                elif 'email' in text or 'e-mail' in text or 'email' in note_text or 'e-mail' in note_text:
                     return 'email'
-                elif 'follow' in text or 'acompanhar' in text:
-                    return 'followup'
+                elif any(keyword in text or keyword in note_text for keyword in ['fup', 'follow', 'acompanhar', 'retorno', 'retornar', 'abordar', 'apresentação', 'ligação', 'ligar', 'contato', 'acompanhamento', 'retornar contato', 'retornar ligação', 'fazer contato', 'entrar em contato', 'prospeção']):
+                    # Aplicar segmentação para follow-ups detectados por texto
+                    fup_tipo = self._classify_followup_type(text, note_text)
+                    return f'followup_{fup_tipo}'
                 else:
                     return 'tarefa'
                     

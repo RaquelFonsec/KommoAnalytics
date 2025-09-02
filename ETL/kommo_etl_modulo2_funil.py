@@ -294,12 +294,63 @@ class KommoFunnelETL:
             logger.error(f"Erro na extração: {e}")
             raise
 
+    def get_loss_reasons_mapping(self):
+        """
+        Buscar mapeamento de IDs para nomes dos motivos de perda
+        """
+        try:
+            logger.info("Buscando mapeamento de motivos de perda...")
+            
+            url = f"{self.kommo_config['base_url']}/api/v4/leads/loss_reasons"
+            params = {'limit': 250}
+            
+            loss_reasons_mapping = {}
+            page = 1
+            
+            while True:
+                params['page'] = page
+                try:
+                    response = requests.get(url, headers=self.headers, params=params)
+                    response.raise_for_status()
+                    
+                    data = response.json()
+                    reasons = data.get('_embedded', {}).get('loss_reasons', [])
+                    
+                    if not reasons:
+                        break
+                    
+                    for reason in reasons:
+                        reason_id = reason.get('id')
+                        reason_name = reason.get('name')
+                        
+                        if reason_id and reason_name:
+                            loss_reasons_mapping[reason_id] = reason_name
+                    
+                    if len(reasons) < 250:
+                        break
+                        
+                    page += 1
+                    
+                except Exception as e:
+                    logger.error(f"Erro ao buscar motivos de perda na página {page}: {e}")
+                    break
+            
+            logger.info(f"Mapeamento de motivos de perda carregado: {len(loss_reasons_mapping)} motivos")
+            return loss_reasons_mapping
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar mapeamento de motivos de perda: {e}")
+            return {}
+
     def extract_loss_reasons(self, start_date: datetime, end_date: datetime, lead_ids: List[int]) -> Dict:
         """
         Extrair motivos de perda dos leads do pipeline principal
         """
         try:
             logger.info("Buscando motivos de perda na API do Kommo...")
+            
+            # Buscar mapeamento de motivos de perda
+            loss_reasons_mapping = self.get_loss_reasons_mapping()
             
             # Identificar status de "perdido" do pipeline principal
             lost_status_ids = [
@@ -342,8 +393,10 @@ class KommoFunnelETL:
                                 loss_reason_id = lead.get('loss_reason_id')
                                 loss_reason_name = lead.get('loss_reason_name')
                                 
-                                # Mapear valores nulos/vazios
-                                if not loss_reason_name or loss_reason_name.strip() == '':
+                                # Usar mapeamento para obter nome real do motivo
+                                if loss_reason_id and loss_reason_id in loss_reasons_mapping:
+                                    loss_reason_name = loss_reasons_mapping[loss_reason_id]
+                                elif not loss_reason_name or loss_reason_name.strip() == '':
                                     if loss_reason_id:
                                         loss_reason_name = f"Motivo ID {loss_reason_id}"
                                     else:

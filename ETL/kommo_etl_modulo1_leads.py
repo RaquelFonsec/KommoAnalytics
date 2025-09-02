@@ -432,7 +432,7 @@ class KommoLeadsETL:
                 'detailed_source': 'Erro'
             }
 
-    # CORREÇÃO URGENTE - Adicione estes métodos ao seu ETL
+    
 
     def determine_primary_source(self, source_info: Dict) -> str:
         """
@@ -520,16 +520,25 @@ class KommoLeadsETL:
         # 8. Se não tem nenhuma informação, usar classificação baseada no pipeline
         if pipeline_id:
             # Classificação baseada no volume de leads por pipeline
-            if pipeline_id == 11146887:  # Pipeline principal
-                return 'Website Direto'  # Assumindo que é o canal principal
+            if pipeline_id == 11146887:  # Pipeline principal (maior volume)
+                return 'Website Direto'  # Canal principal - leads diretos
             elif pipeline_id == 11435023:  # Pipeline secundário
-                return 'Mídia Paga'  # Assumindo que é mídia paga
+                return 'Mídia Paga'  # Mídia paga
             elif pipeline_id == 11386583:  # Pipeline terciário
-                return 'Redes Sociais'  # Assumindo que é redes sociais
+                return 'Redes Sociais'  # Redes sociais
+            elif pipeline_id == 11724647:  # Pipeline de teste
+                return 'Teste'
+            elif pipeline_id == 11730455:  # Pipeline específico
+                return 'Landing Page'
+            elif pipeline_id == 11728567:  # Pipeline específico
+                return 'Formulário'
+            elif pipeline_id == 11643443:  # Pipeline específico
+                return 'Indicação'
             else:
                 return 'Origem Não Especificada'
         
-        return 'Origem Desconhecida'
+        # 9. Se não tem pipeline, usar classificação genérica
+        return 'Origem Não Especificada'
 
     def determine_primary_source_improved(self, source_info: Dict) -> str:
         """
@@ -891,39 +900,69 @@ class KommoLeadsETL:
         """
         # Mapeamento baseado nos IDs reais dos pipelines encontrados no banco
         pipeline_mapping = {
-            11146887: 'Funil Principal',  # Pipeline principal com 2130 leads
-            11435023: 'Funil Secundário', # Pipeline secundário com 362 leads
-            11386583: 'Funil Terciário',  # Pipeline terciário com 101 leads
-            11730455: 'Funil Especial',   # Pipeline especial com 10 leads
-            11724647: 'Funil Teste',      # Pipeline de teste com 9 leads
-            11643443: 'Funil Outro',      # Outro pipeline
-            11728567: 'Funil Outro'       # Outro pipeline
+            11146887: 'Website Direto',   # Pipeline principal - leads diretos
+            11435023: 'Mídia Paga',       # Pipeline secundário - mídia paga
+            11386583: 'Redes Sociais',    # Pipeline terciário - redes sociais
+            11730455: 'Landing Page',     # Pipeline especial - landing page
+            11724647: 'Teste',            # Pipeline de teste
+            11643443: 'Indicação',        # Outro pipeline - indicação
+            11728567: 'Formulário'        # Outro pipeline - formulário
         }
         
         return pipeline_mapping.get(pipeline_id, 'Pipeline Desconhecido')
 
     def calculate_response_time(self, lead: Dict, events: List[Dict]) -> Optional[float]:
         """
-        Calcular tempo de resposta em horas
+        Calcular tempo de resposta em horas - CORRIGIDO para usar atividades comerciais
         """
         try:
             lead_id = lead.get('id')
             lead_created = datetime.fromtimestamp(lead.get('created_at', 0))
             
-            # Buscar primeiro evento/nota relacionado ao lead
-            lead_events = [
-                event for event in events 
-                if event.get('entity_id') == lead_id and event.get('entity_type') == 'lead'
-            ]
-            
-            if lead_events:
-                # Ordenar por data de criação
-                lead_events.sort(key=lambda x: x.get('created_at', 0))
-                first_response = datetime.fromtimestamp(lead_events[0].get('created_at', 0))
+            # Buscar atividades comerciais do banco para este lead
+            try:
+                conn = mysql.connector.connect(**self.db_config)
+                cursor = conn.cursor()
                 
-                # Calcular diferença em horas
-                time_diff = (first_response - lead_created).total_seconds() / 3600
-                return round(time_diff, 2)
+                # Buscar primeira atividade para este lead
+                query = """
+                SELECT MIN(created_date) as primeira_atividade
+                FROM commercial_activities 
+                WHERE entity_id = %s 
+                AND entity_type = 'leads'
+                AND contact_type IN ('tarefa', 'ligacao_agendada', 'reuniao_agendada', 'email', 'nota')
+                """
+                
+                cursor.execute(query, (lead_id,))
+                result = cursor.fetchone()
+                
+                if result and result[0]:
+                    primeira_atividade = result[0]
+                    
+                    # Converter para datetime se for date
+                    from datetime import date
+                    if isinstance(primeira_atividade, date):
+                        primeira_atividade = datetime.combine(primeira_atividade, datetime.min.time())
+                    
+                    # Calcular diferença em horas
+                    time_diff = (primeira_atividade - lead_created).total_seconds() / 3600
+                    
+                    # VALIDAÇÃO: Tempo máximo realista (48 horas)
+                    if time_diff > 48:
+                        logger.warning(f"Tempo de resposta irrealista para lead {lead_id}: {time_diff:.1f}h - ignorando")
+                        cursor.close()
+                        conn.close()
+                        return None
+                    
+                    cursor.close()
+                    conn.close()
+                    return round(time_diff, 2)
+                
+                cursor.close()
+                conn.close()
+                
+            except Exception as db_error:
+                logger.warning(f"Erro ao buscar atividades do banco para lead {lead_id}: {db_error}")
             
             return None
             

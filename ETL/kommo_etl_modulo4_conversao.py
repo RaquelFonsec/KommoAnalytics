@@ -355,12 +355,16 @@ class KommoConversionETL:
             
             # Verificar em campos customizados
             custom_fields = lead.get('custom_fields_values', [])
+            if custom_fields is None:
+                custom_fields = []
             for field in custom_fields:
                 field_name = field.get('field_name', '').lower()
                 if 'motivo' in field_name or 'reason' in field_name or 'perda' in field_name:
-                    value = field.get('values', [{}])[0].get('value')
-                    if value:
-                        return str(value)
+                    values = field.get('values', [])
+                    if values and len(values) > 0:
+                        value = values[0].get('value')
+                        if value:
+                            return str(value)
             
             return 'Não especificado'
             

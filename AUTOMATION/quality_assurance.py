@@ -296,3 +296,5 @@ if __name__ == "__main__":
         print("\n⚠️ GARANTIA DE QUALIDADE REPROVADA!")
         print("🔧 Corrija os problemas identificados antes de usar o sistema")
         print("📞 Entre em contato se precisar de ajuda")
+
+

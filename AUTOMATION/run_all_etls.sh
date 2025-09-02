@@ -4,7 +4,7 @@
 # Data: $(date)
 
 # Configurações
-PROJECT_DIR="/home/raquel-fonseca/KommoAnalytics"
+PROJECT_DIR="/home/raquel-fonseca/Projects/KommoAnalytics"
 LOG_DIR="$PROJECT_DIR/LOGS"
 VENV_PATH="$PROJECT_DIR/venv"
 ETL_DIR="$PROJECT_DIR/ETL"
@@ -106,3 +106,4 @@ find "$LOG_DIR" -name "*.log" -type f -mtime +7 -delete
 
 # Enviar notificação (opcional)
 # curl -X POST "https://seu-webhook.com/notificacao" -d "ETLs executados: $success_count/$total_etls"
+

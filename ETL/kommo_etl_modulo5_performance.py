@@ -385,9 +385,12 @@ class KommoPerformanceETL:
             connection = mysql.connector.connect(**self.db_config)
             cursor = connection.cursor()
             
-            # Limpar todos os dados existentes
-            cursor.execute("DELETE FROM performance_vendedores")
-            cursor.execute("DELETE FROM performance_canais")
+            created_date = datetime.now().date()
+            
+            # Limpar dados existentes dos últimos 30 dias
+            start_date = (datetime.now() - timedelta(days=30)).date()
+            cursor.execute("DELETE FROM performance_vendedores WHERE created_date >= %s", (start_date,))
+            cursor.execute("DELETE FROM performance_canais WHERE created_date >= %s", (start_date,))
             
             # Inserir dados de vendedores
             vendedores_insert = """

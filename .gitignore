@@ -1,23 +1,9 @@
-# KOMMO ANALYTICS - GITIGNORE
-# Arquivo para ignorar arquivos desnecessários no controle de versão
-
-# =====================================
-# ARQUIVOS SENSÍVEIS
-# =====================================
-.env
-.env.local
-.env.production
-*.key
-*.pem
-*.crt
-
-# =====================================
-# PYTHON
-# =====================================
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+
+# C distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -31,86 +17,158 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# =====================================
-# AMBIENTE VIRTUAL
-# =====================================
-dashboard_env/
-venv/
-ENV/
-env/
-.venv/
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
 
-# =====================================
-# LOGS E TEMPORÁRIOS
-# =====================================
-LOGS/*.log
-LOGS/*.txt
-# Relatórios (removido - não mais necessário)
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
 *.log
-*.tmp
-*.temp
-*~
-*.swp
-*.swo
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
 
-# =====================================
-# DADOS E EXPORTS
-# =====================================
-DATA/exports/*.json
-DATA/exports/*.csv
-DATA/exports/*.xlsx
-ETL/DATA/exports/*.json
+# Flask stuff:
+instance/
+.webassets-cache
 
-# =====================================
-# SISTEMA OPERACIONAL
-# =====================================
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Scrapy stuff:
+.scrapy
 
-# =====================================
-# EDITORES
-# =====================================
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
+# Sphinx documentation
+docs/_build/
 
-# =====================================
-# JUPYTER NOTEBOOK
-# =====================================
+# PyBuilder
+target/
+
+# Jupyter Notebook
 .ipynb_checkpoints
 
-# =====================================
-# CACHE
-# =====================================
-.cache/
-.pytest_cache/
-.coverage
+# IPython
+profile_default/
+ipython_config.py
 
-# =====================================
-# STREAMLIT
-# =====================================
-.streamlit/secrets.toml
+# pyenv
+.python-version
 
-# =====================================
-# MYSQL
-# =====================================
-*.sql~
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
 
-# =====================================
-# MANTER ESTRUTURA DE DIRETÓRIOS
-# =====================================
-!LOGS/.gitkeep
-# Relatórios (removido - não mais necessário)
-!DATA/exports/.gitkeep
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Kommo Analytics specific
+# Arquivos de credenciais sensíveis
+.env
+.env.local
+.env.production
+*.key
+*.pem
+*.p12
+
+# Logs
+LOGS/
+*.log
+
+# Dados temporários
+DATA/
+TEMP/
+CACHE/
+
+# Backups
+BACKUP/
+*.sql
+*.sql.gz
+
+# Arquivos de configuração local
+config_local.py
+settings_local.py
+
+# Arquivos de teste
+test_*.py
+*_test.py
+
+# Arquivos temporários do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos de lock
+package-lock.json
+yarn.lock
+Pipfile.lock
