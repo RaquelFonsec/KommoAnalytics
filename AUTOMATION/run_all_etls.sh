@@ -6,7 +6,7 @@
 # Configurações
 PROJECT_DIR="/home/raquel-fonseca/KommoAnalytics"
 LOG_DIR="$PROJECT_DIR/LOGS"
-VENV_PATH="$PROJECT_DIR/dashboard_env"
+VENV_PATH="$PROJECT_DIR/venv"
 ETL_DIR="$PROJECT_DIR/ETL"
 
 # Criar diretório de logs se não existir
@@ -22,16 +22,16 @@ run_etl() {
     local etl_name="$1"
     local etl_file="$2"
     
-    log_with_timestamp "🚀 Iniciando $etl_name..."
+    log_with_timestamp " Iniciando $etl_name..."
     
     cd "$ETL_DIR"
     source "$VENV_PATH/bin/activate"
     
     if python3 "$etl_file" >> "$LOG_DIR/${etl_name,,}_$(date +%Y%m%d).log" 2>&1; then
-        log_with_timestamp "✅ $etl_name concluído com sucesso"
+        log_with_timestamp " $etl_name concluído com sucesso"
         return 0
     else
-        log_with_timestamp "❌ Erro no $etl_name - verificar logs"
+        log_with_timestamp " Erro no $etl_name - verificar logs"
         return 1
     fi
 }

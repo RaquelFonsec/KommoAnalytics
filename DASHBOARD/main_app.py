@@ -751,10 +751,10 @@ SELECT
     user_name,
     user_role,
     COUNT(*) as total_atividades,
-    COUNT(CASE WHEN note_text LIKE '%FUP%' THEN 1 END) as followups,
-    COUNT(CASE WHEN note_text LIKE '%ligar%' OR note_text LIKE '%contato%' OR note_text LIKE '%retorno%' THEN 1 END) as contatos,
-    COUNT(CASE WHEN note_text LIKE '%reuniao%' OR note_text LIKE '%meeting%' THEN 1 END) as reunioes,
-    COUNT(CASE WHEN note_text LIKE '%email%' OR note_text LIKE '%e-mail%' THEN 1 END) as emails,
+    COUNT(CASE WHEN is_follow_up = 1 THEN 1 END) as followups,
+    COUNT(CASE WHEN note_text LIKE '%ligar%' OR note_text LIKE '%contato%' OR note_text LIKE '%telefone%' OR note_text LIKE '%whatsapp%' THEN 1 END) as contatos,
+    COUNT(CASE WHEN note_text LIKE '%reuniao%' OR note_text LIKE '%meeting%' OR note_text LIKE '%apresentacao%' OR note_text LIKE '%agendamento%' THEN 1 END) as reunioes,
+    COUNT(CASE WHEN note_text LIKE '%email%' OR note_text LIKE '%e-mail%' OR note_text LIKE '%correio%' THEN 1 END) as emails,
     COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) as concluidas,
     ROUND(COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
     COUNT(DISTINCT entity_id) as leads_diferentes
@@ -766,6 +766,36 @@ LIMIT 10
 """
 
 vendedores_df = run_query(vendedores_query)
+
+# Buscar dados de segmentação dos follow-ups para integrar na tabela principal
+followup_segmentation_query = f"""
+SELECT 
+    user_name,
+    COUNT(*) as total_followups,
+    COUNT(CASE WHEN follow_up_category = 'alta_prioridade' THEN 1 END) as alta_prioridade,
+    COUNT(CASE WHEN follow_up_category = 'media_prioridade' THEN 1 END) as media_prioridade,
+    COUNT(CASE WHEN follow_up_category = 'baixa_prioridade' THEN 1 END) as baixa_prioridade,
+    AVG(urgency_score) as score_medio_urgencia
+FROM commercial_activities 
+WHERE created_date >= '{data_inicio.date()}' AND is_follow_up = 1
+GROUP BY user_name
+"""
+
+followup_segmentation_df = run_query(followup_segmentation_query)
+
+# Buscar dados de taxa de resposta e follow-ups no prazo
+response_metrics_query = f"""
+SELECT 
+    user_name,
+    COUNT(CASE WHEN activity_type = 'note' AND note_text LIKE '%resposta%' OR note_text LIKE '%retorno%' THEN 1 END) as respostas_recebidas,
+    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till >= created_date THEN 1 END) as followups_no_prazo,
+    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till < created_date THEN 1 END) as followups_atrasados
+FROM commercial_activities 
+WHERE created_date >= '{data_inicio.date()}'
+GROUP BY user_name
+"""
+
+response_metrics_df = run_query(response_metrics_query)
 
 if not vendedores_df.empty:
     col1, col2 = st.columns(2)
@@ -813,22 +843,108 @@ if not vendedores_df.empty:
 st.subheader("📋 Detalhamento por Vendedor")
 
 if not vendedores_df.empty:
-    # Renomear colunas para exibição
-    vendedores_display = vendedores_df.copy()
-    vendedores_display = vendedores_display.rename(columns={
-        'user_name': 'Vendedor',
-        'user_role': 'Cargo',
-        'total_atividades': 'Total Atividades',
-        'contatos': 'Contatos',
-        'emails': 'E-mails',
-        'reunioes': 'Reuniões',
-        'followups': 'Follow-ups',
-        'concluidas': 'Concluídas',
-        'taxa_conclusao': 'Taxa Conclusão (%)',
-        'leads_diferentes': 'Leads Únicos'
-    })
+    # Criar DataFrame final com todas as métricas
+    vendedores_final = []
+    for _, row in vendedores_df.iterrows():
+        vendedor = row['user_name']
+        
+        # Buscar dados de segmentação de follow-ups
+        followup_data = followup_segmentation_df[followup_segmentation_df['user_name'] == vendedor]
+        alta_prioridade = followup_data.iloc[0]['alta_prioridade'] if not followup_data.empty else 0
+        media_prioridade = followup_data.iloc[0]['media_prioridade'] if not followup_data.empty else 0
+        baixa_prioridade = followup_data.iloc[0]['baixa_prioridade'] if not followup_data.empty else 0
+        score_urgencia = followup_data.iloc[0]['score_medio_urgencia'] if not followup_data.empty else 0
+        
+        # Buscar dados de resposta e prazo
+        response_data = response_metrics_df[response_metrics_df['user_name'] == vendedor]
+        respostas_recebidas = response_data.iloc[0]['respostas_recebidas'] if not response_data.empty else 0
+        followups_no_prazo = response_data.iloc[0]['followups_no_prazo'] if not response_data.empty else 0
+        followups_atrasados = response_data.iloc[0]['followups_atrasados'] if not response_data.empty else 0
+        
+        # Calcular taxa de resposta
+        total_contatos = row['contatos'] + row['emails']
+        taxa_resposta = (respostas_recebidas / total_contatos * 100) if total_contatos > 0 else 0
+        
+        # Calcular taxa de follow-ups no prazo
+        total_followups = row['followups']
+        taxa_followups_prazo = (followups_no_prazo / total_followups * 100) if total_followups > 0 else 0
+        
+        vendedores_final.append({
+            'Vendedor': vendedor,
+            'Cargo': row.get('user_role', 'N/A'),
+            'Total Atividades': row['total_atividades'],
+            'Follow-ups': row['followups'],
+            'Contatos': row['contatos'],
+            'Reuniões': row['reunioes'],
+            'E-mails': row['emails'],
+            'Concluídas': row['concluidas'],
+            'Taxa Conclusão (%)': row['taxa_conclusao'],
+            'Leads Únicos': row['leads_diferentes'],
+            'Alta Prioridade': alta_prioridade,
+            'Média Prioridade': media_prioridade,
+            'Baixa Prioridade': baixa_prioridade,
+            'Score Urgência': f"{score_urgencia:.1f}" if score_urgencia > 0 else "0.0",
+            'Taxa Resposta (%)': f"{taxa_resposta:.1f}",
+            'Follow-ups no Prazo (%)': f"{taxa_followups_prazo:.1f}"
+        })
     
-    st.dataframe(vendedores_display, use_container_width=True)
+    vendedores_final_df = pd.DataFrame(vendedores_final)
+    
+    # Exibir tabela com todas as métricas
+    st.dataframe(vendedores_final_df, use_container_width=True)
+    
+    # Resumo das métricas de follow-up
+    st.subheader("🎯 Resumo de Follow-ups e Engajamento")
+
+    # Explicação das métricas
+    st.info("""
+**📊 NOVAS MÉTRICAS INTEGRADAS:**
+
+**🎯 SEGMENTAÇÃO DE FOLLOW-UPS:**
+- **Alta Prioridade**: Ações imediatas necessárias (score 8-10)
+- **Média Prioridade**: Acompanhamento regular (score 5-7)  
+- **Baixa Prioridade**: Manutenção de relacionamento (score 1-4)
+- **Score Urgência**: Média ponderada de 1-10 baseada na API do Kommo
+
+**📈 MÉTRICAS DE ENGAJAMENTO:**
+- **Taxa Resposta (%)**: % de contatos que geraram resposta do lead
+- **Follow-ups no Prazo (%)**: % de follow-ups realizados dentro do prazo definido
+
+**💡 IMPORTÂNCIA**: Avalia a cadência de prospecção, qualidade do engajamento e eficiência na gestão de follow-ups.
+""")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Score médio de urgência por vendedor
+        if not followup_segmentation_df.empty:
+            urgency_summary = followup_segmentation_df.sort_values('score_medio_urgencia', ascending=False).head(8)
+            fig_urgency = px.bar(
+                urgency_summary, 
+                x='user_name', 
+                y='score_medio_urgencia',
+                title="Score Médio de Urgência por Vendedor",
+                labels={'user_name': 'Vendedor', 'score_medio_urgencia': 'Score Urgência (1-10)'}
+            )
+            fig_urgency.update_xaxes(tickangle=45)
+            st.plotly_chart(fig_urgency, use_container_width=True)
+    
+    with col2:
+        # Distribuição por categoria de prioridade
+        if not followup_segmentation_df.empty:
+            priority_dist = followup_segmentation_df[['alta_prioridade', 'media_prioridade', 'baixa_prioridade']].sum()
+            priority_df = pd.DataFrame({
+                'Categoria': ['Alta Prioridade', 'Média Prioridade', 'Baixa Prioridade'],
+                'Quantidade': [priority_dist['alta_prioridade'], priority_dist['media_prioridade'], priority_dist['baixa_prioridade']]
+            })
+            
+            fig_priority = px.pie(
+                priority_df, 
+                values='Quantidade', 
+                names='Categoria',
+                title="Distribuição por Categoria de Prioridade"
+            )
+            st.plotly_chart(fig_priority, use_container_width=True)
 
 # Análise temporal
 st.subheader("📈 Atividades ao Longo do Tempo")
@@ -1662,20 +1778,20 @@ if not forecast_df.empty and not results_df.empty and not gaps_df.empty:
     
     with col1:
         st.markdown("**🎯 METAS E PREVISÕES:**")
-        st.markdown(f"- **Meta de Receita:** R$ {forecast['meta_receita']:,.2f}")
-        st.markdown(f"- **Previsão de Receita:** R$ {forecast['previsao_receita']:,.2f}")
-        st.markdown(f"- **Previsão de Leads:** {forecast['previsao_leads']:,}")
-        st.markdown(f"- **Win Rate Esperado:** {forecast['previsao_win_rate']:.1f}%")
-        st.markdown(f"- **Ticket Médio Esperado:** R$ {forecast['previsao_ticket_medio']:,.2f}")
+        st.markdown(f"- **Meta de Receita:** R$ {forecast.get('meta_receita', 0) or 0:,.2f}")
+        st.markdown(f"- **Previsão de Receita:** R$ {forecast.get('previsao_receita', 0) or 0:,.2f}")
+        st.markdown(f"- **Previsão de Leads:** {forecast.get('previsao_leads', 0) or 0:,}")
+        st.markdown(f"- **Win Rate Esperado:** {forecast.get('previsao_win_rate', 0) or 0:.1f}%")
+        st.markdown(f"- **Ticket Médio Esperado:** R$ {forecast.get('previsao_ticket_medio', 0) or 0:,.2f}")
     
     with col2:
         st.markdown("**📊 RESULTADOS ATUAIS:**")
-        st.markdown(f"- **Receita Realizada:** R$ {results['receita_realizada']:,.2f}")
-        st.markdown(f"- **Leads Realizados:** {results['leads_realizados']:,}")
-        st.markdown(f"- **Vendas Fechadas:** {results['vendas_fechadas']}")
-        st.markdown(f"- **Win Rate Real:** {results['win_rate_real']:.1f}%")
-        st.markdown(f"- **Ticket Médio Real:** R$ {results['ticket_medio_real']:,.2f}")
-        st.markdown(f"- **Dias Restantes:** {results['dias_restantes']}")
+        st.markdown(f"- **Receita Realizada:** R$ {results.get('receita_realizada', 0) or 0:,.2f}")
+        st.markdown(f"- **Leads Realizados:** {results.get('leads_realizados', 0) or 0:,}")
+        st.markdown(f"- **Vendas Fechadas:** {results.get('vendas_fechadas', 0) or 0}")
+        st.markdown(f"- **Win Rate Real:** {results.get('win_rate_real', 0) or 0:.1f}%")
+        st.markdown(f"- **Ticket Médio Real:** R$ {results.get('ticket_medio_real', 0) or 0:,.2f}")
+        st.markdown(f"- **Dias Restantes:** {results.get('dias_restantes', 0) or 0}")
 
 # Análise de Performance
 st.subheader("📈 Análise de Performance")
@@ -1687,17 +1803,17 @@ if not gaps_df.empty:
     
     with col1:
         st.markdown("**📊 GAPS IDENTIFICADOS:**")
-        st.markdown(f"- **Gap de Receita:** R$ {gaps['gap_receita']:,.2f}")
-        st.markdown(f"- **Gap de Leads:** {gaps['gap_leads']}")
-        st.markdown(f"- **Gap de Win Rate:** {gaps['gap_win_rate']:.1f}%")
-        st.markdown(f"- **Gap de Ticket Médio:** R$ {gaps['gap_ticket_medio']:,.2f}")
+        st.markdown(f"- **Gap de Receita:** R$ {gaps.get('gap_receita', 0) or 0:,.2f}")
+        st.markdown(f"- **Gap de Leads:** {gaps.get('gap_leads', 0) or 0}")
+        st.markdown(f"- **Gap de Win Rate:** {gaps.get('gap_win_rate', 0) or 0:.1f}%")
+        st.markdown(f"- **Gap de Ticket Médio:** R$ {gaps.get('gap_ticket_medio', 0) or 0:,.2f}")
     
     with col2:
         st.markdown("**🎯 NECESSIDADES PARA ATINGIR META:**")
-        st.markdown(f"- **Receita/Dia:** R$ {gaps['receita_necessaria_diaria']:,.0f}")
-        st.markdown(f"- **Leads/Dia:** {gaps['leads_necessarios_diarios']:.0f}")
-        st.markdown(f"- **Win Rate:** {gaps['win_rate_necessario']:.1f}%")
-        st.markdown(f"- **Ticket Médio:** R$ {gaps['ticket_medio_necessario']:,.0f}")
+        st.markdown(f"- **Receita/Dia:** R$ {gaps.get('receita_necessaria_diaria', 0) or 0:,.0f}")
+        st.markdown(f"- **Leads/Dia:** {gaps.get('leads_necessarios_diarios', 0) or 0:.0f}")
+        st.markdown(f"- **Win Rate:** {gaps.get('win_rate_necessario', 0) or 0:.1f}%")
+        st.markdown(f"- **Ticket Médio:** R$ {gaps.get('ticket_medio_necessario', 0) or 0:,.0f}")
 
 # Alertas Automáticos
 st.subheader("🚨 Alertas Automáticos")
@@ -1705,12 +1821,43 @@ st.subheader("🚨 Alertas Automáticos")
 if not gaps_df.empty:
     gaps = gaps_df.iloc[0]
     
-    if gaps['risco_meta'] == 'critico':
+    if gaps.get('risco_meta') == 'critico':
         st.error("🚨 **ALERTA CRÍTICO**: Risco alto de não atingir a meta! Ações imediatas necessárias.")
-    elif gaps['risco_meta'] == 'alto':
+    elif gaps.get('risco_meta') == 'alto':
         st.warning("⚠️ **ALERTA ALTO**: Risco moderado de não atingir a meta. Acompanhamento intensivo necessário.")
-    elif gaps['risco_meta'] == 'medio':
+    elif gaps.get('risco_meta') == 'medio':
         st.info("ℹ️ **ALERTA MÉDIO**: Risco baixo, mas atenção aos gaps identificados.")
     else:
         st.success("✅ **STATUS OK**: Meta em dia, mantendo performance atual.")
+
+# Buscar dados de segmentação dos follow-ups para integrar na tabela principal
+followup_segmentation_query = f"""
+SELECT 
+    user_name,
+    COUNT(*) as total_followups,
+    COUNT(CASE WHEN follow_up_category = 'alta_prioridade' THEN 1 END) as alta_prioridade,
+    COUNT(CASE WHEN follow_up_category = 'media_prioridade' THEN 1 END) as media_prioridade,
+    COUNT(CASE WHEN follow_up_category = 'baixa_prioridade' THEN 1 END) as baixa_prioridade,
+    AVG(urgency_score) as score_medio_urgencia
+FROM commercial_activities 
+WHERE created_date >= '{data_inicio.date()}' AND is_follow_up = 1
+GROUP BY user_name
+"""
+
+followup_segmentation_df = run_query(followup_segmentation_query)
+
+# Buscar dados de taxa de resposta e follow-ups no prazo
+response_metrics_query = f"""
+SELECT 
+    user_name,
+    COUNT(CASE WHEN activity_type = 'note' AND note_text LIKE '%resposta%' OR note_text LIKE '%retorno%' THEN 1 END) as respostas_recebidas,
+    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till >= created_date THEN 1 END) as followups_no_prazo,
+    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till < created_date THEN 1 END) as followups_atrasados
+FROM commercial_activities 
+WHERE created_date >= '{data_inicio.date()}'
+GROUP BY user_name
+"""
+
+response_metrics_df = run_query(response_metrics_query)
+
 

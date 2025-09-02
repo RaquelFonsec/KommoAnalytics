@@ -356,11 +356,11 @@ class KommoActivityETL:
                         logger.warning(f"Erro ao buscar eventos {event_type} página {page}: {e}")
                         break
             
-            logger.info(f"✅ Extraídos {len(communication_events)} eventos de comunicação")
+            logger.info(f" Extraídos {len(communication_events)} eventos de comunicação")
             return communication_events
             
         except Exception as e:
-            logger.error(f"❌ Erro ao extrair eventos de comunicação: {e}")
+            logger.error(f" Erro ao extrair eventos de comunicação: {e}")
             return []
 
     def extract_all_notes(self, start_timestamp: int, end_timestamp: int) -> List[Dict]:
@@ -368,7 +368,7 @@ class KommoActivityETL:
         Extrair todas as notas e comentários
         """
         try:
-            logger.info("📝 Buscando notas e comentários...")
+            logger.info(" Buscando notas e comentários...")
             
             # Método 1: Buscar via eventos
             notes_url = f"{self.kommo_config['base_url']}/api/v4/events"
@@ -410,11 +410,11 @@ class KommoActivityETL:
                     logger.warning(f"Erro ao buscar notas página {page}: {e}")
                     break
             
-            logger.info(f"✅ Extraídas {len(all_notes)} notas")
+            logger.info(f" Extraídas {len(all_notes)} notas")
             return all_notes
             
         except Exception as e:
-            logger.error(f"❌ Erro ao extrair notas: {e}")
+            logger.error(f" Erro ao extrair notas: {e}")
             return []
 
     def extract_meetings(self, start_timestamp: int, end_timestamp: int) -> List[Dict]:
@@ -422,7 +422,7 @@ class KommoActivityETL:
         Extrair reuniões agendadas
         """
         try:
-            logger.info("📅 Buscando reuniões agendadas...")
+            logger.info(" Buscando reuniões agendadas...")
             
             # Buscar tarefas que são reuniões
             tasks_url = f"{self.kommo_config['base_url']}/api/v4/tasks"
@@ -468,7 +468,7 @@ class KommoActivityETL:
             return all_meetings
             
         except Exception as e:
-            logger.error(f"❌ Erro ao extrair reuniões: {e}")
+            logger.error(f" Erro ao extrair reuniões: {e}")
             return []
 
     def extract_tasks(self, start_timestamp: int, end_timestamp: int) -> List[Dict]:
@@ -841,6 +841,199 @@ class KommoActivityETL:
             logger.warning(f"Erro ao classificar tipo de contato: {e}")
             return 'erro'
 
+    def classify_follow_up_intelligent(self, activity_data: Dict, activity_type: str) -> bool:
+        """
+        Classificação inteligente de follow-ups baseada em múltiplos critérios da API
+        """
+        try:
+            # 1. Verificar se é explicitamente marcado como follow-up na API
+            if activity_type == 'task':
+                task_type = activity_data.get('task_type')
+                if task_type == 5:  # Follow-up explícito no Kommo
+                    return True
+                
+                # Verificar tags ou campos específicos
+                tags = activity_data.get('tags', [])
+                if any('follow' in str(tag).lower() or 'fup' in str(tag).lower() for tag in tags):
+                    return True
+            
+            # 2. Análise do texto da atividade - MAIS RESTRITIVA
+            text = str(activity_data.get('text', '')).lower()
+            note_text = str(activity_data.get('note', '')).lower()
+            combined_text = f"{text} {note_text}"
+            
+            # Padrões de follow-up - APENAS os mais específicos
+            follow_up_patterns = [
+                'fup', 'follow up', 'followup', 'follow-up',
+                'acompanhamento', 'acompanhar', 'acompanha',
+                'retorno', 'retornar', 'verificar retorno',
+                'verificar', 'confirmar', 'confirma',
+                'lembrar', 'lembrete', 'lembrar de',
+                'prospeção', 'prospectar', 'prospect',
+                'nurturing', 'nurture', 'cuidar',
+                're-engajamento', 'reengajamento', 're-engajar',
+                'recontato', 're-contato', 'novo contato',
+                'segunda tentativa', 'terceira tentativa',
+                'tentativa', 'tentar novamente'
+            ]
+            
+            # Só classificar como follow-up se o texto for EXPLICITAMENTE sobre follow-up
+            if any(pattern in combined_text for pattern in follow_up_patterns):
+                return True
+            
+            # 3. Verificar se é uma atividade de re-engajamento (mais específico)
+            entity_id = activity_data.get('entity_id')
+            if entity_id and activity_type == 'task':
+                # Verificar se é uma tarefa programada para acompanhamento
+                complete_till = activity_data.get('complete_till')
+                if complete_till:
+                    # Só considerar follow-up se for uma tarefa de acompanhamento específica
+                    # Não todas as tarefas com prazo
+                    pass
+            
+            # 4. Verificar campos específicos da API do Kommo
+            if activity_type == 'note':
+                note_type = activity_data.get('note_type')
+                if note_type in ['follow_up', 'followup', 'reminder']:
+                    return True
+            
+            # 5. NÃO classificar como follow-up por padrão
+            # Só se for explicitamente marcado ou tiver texto específico
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Erro ao classificar follow-up inteligente: {e}")
+            return False
+
+    def segment_follow_ups(self, activity_data: Dict, activity_type: str) -> Dict:
+        """
+        Segmentação inteligente de follow-ups em diferentes categorias
+        """
+        try:
+            if not self.classify_follow_up_intelligent(activity_data, activity_type):
+                return {'is_follow_up': False, 'follow_up_type': None, 'follow_up_category': None}
+            
+            text = str(activity_data.get('text', '')).lower()
+            note_text = str(activity_data.get('note', '')).lower()
+            combined_text = f"{text} {note_text}"
+            
+            # 1. SEGMENTAÇÃO POR TIPO DE FOLLOW-UP
+            follow_up_type = None
+            
+            # Prospecção e Nurturing
+            if any(word in combined_text for word in ['prospeção', 'prospectar', 'prospect', 'nurturing', 'nurture']):
+                follow_up_type = 'prospeccao_nurturing'
+            # Acompanhamento de Lead
+            elif any(word in combined_text for word in ['acompanhamento', 'acompanhar', 'acompanha', 'fup']):
+                follow_up_type = 'acompanhamento_lead'
+            # Retorno e Re-engajamento
+            elif any(word in combined_text for word in ['retorno', 'retornar', 're-engajamento', 'reengajamento', 're-engajar']):
+                follow_up_type = 'retorno_reengajamento'
+            # Verificação e Confirmação
+            elif any(word in combined_text for word in ['verificar', 'confirmar', 'confirma', 'verificar retorno']):
+                follow_up_type = 'verificacao_confirmacao'
+            # Lembretes e Agendamentos
+            elif any(word in combined_text for word in ['lembrar', 'lembrete', 'lembrar de']):
+                follow_up_type = 'lembrete_agendamento'
+            # Tentativas Múltiplas
+            elif any(word in combined_text for word in ['segunda tentativa', 'terceira tentativa', 'tentativa', 'tentar novamente']):
+                follow_up_type = 'tentativas_multiplas'
+            # Novo Contato
+            elif any(word in combined_text for word in ['recontato', 're-contato', 'novo contato']):
+                follow_up_type = 'novo_contato'
+            else:
+                follow_up_type = 'follow_up_generico'
+            
+            # 2. SEGMENTAÇÃO POR CATEGORIA DE PRIORIDADE
+            follow_up_category = None
+            
+            # Alta Prioridade - Ações imediatas necessárias
+            if follow_up_type in ['retorno_reengajamento', 'verificacao_confirmacao', 'tentativas_multiplas']:
+                follow_up_category = 'alta_prioridade'
+            # Média Prioridade - Acompanhamento regular
+            elif follow_up_type in ['acompanhamento_lead', 'prospeccao_nurturing']:
+                follow_up_category = 'media_prioridade'
+            # Baixa Prioridade - Manutenção de relacionamento
+            elif follow_up_type in ['lembrete_agendamento', 'novo_contato', 'follow_up_generico']:
+                follow_up_category = 'baixa_prioridade'
+            
+            # 3. SEGMENTAÇÃO POR CONTEXTO TEMPORAL
+            temporal_context = None
+            created_at = activity_data.get('created_at')
+            complete_till = activity_data.get('complete_till')
+            
+            if created_at and complete_till:
+                time_diff = complete_till - created_at
+                if time_diff <= 86400:  # 1 dia
+                    temporal_context = 'imediato'
+                elif time_diff <= 604800:  # 1 semana
+                    temporal_context = 'curto_prazo'
+                elif time_diff <= 2592000:  # 1 mês
+                    temporal_context = 'medio_prazo'
+                else:
+                    temporal_context = 'longo_prazo'
+            
+            # 4. SEGMENTAÇÃO POR INTENSIDADE DO FOLLOW-UP
+            intensity = None
+            if follow_up_type == 'tentativas_multiplas':
+                intensity = 'alta'
+            elif follow_up_type in ['retorno_reengajamento', 'verificacao_confirmacao']:
+                intensity = 'media'
+            else:
+                intensity = 'baixa'
+            
+            return {
+                'is_follow_up': True,
+                'follow_up_type': follow_up_type,
+                'follow_up_category': follow_up_category,
+                'temporal_context': temporal_context,
+                'intensity': intensity,
+                'urgency_score': self.calculate_urgency_score(follow_up_type, follow_up_category, temporal_context)
+            }
+            
+        except Exception as e:
+            logger.warning(f"Erro ao segmentar follow-up: {e}")
+            return {'is_follow_up': False, 'follow_up_type': None, 'follow_up_category': None}
+
+    def calculate_urgency_score(self, follow_up_type: str, category: str, temporal: str) -> int:
+        """
+        Calcular score de urgência do follow-up (1-10)
+        """
+        score = 5  # Score base
+        
+        # Ajustar por tipo
+        type_scores = {
+            'tentativas_multiplas': 3,
+            'retorno_reengajamento': 2,
+            'verificacao_confirmacao': 2,
+            'acompanhamento_lead': 1,
+            'prospeccao_nurturing': 0,
+            'lembrete_agendamento': -1,
+            'novo_contato': 0,
+            'follow_up_generico': 0
+        }
+        score += type_scores.get(follow_up_type, 0)
+        
+        # Ajustar por categoria
+        category_scores = {
+            'alta_prioridade': 2,
+            'media_prioridade': 0,
+            'baixa_prioridade': -1
+        }
+        score += category_scores.get(category, 0)
+        
+        # Ajustar por contexto temporal
+        temporal_scores = {
+            'imediato': 2,
+            'curto_prazo': 1,
+            'medio_prazo': 0,
+            'longo_prazo': -1
+        }
+        score += temporal_scores.get(temporal, 0)
+        
+        # Limitar entre 1 e 10
+        return max(1, min(10, score))
+
     def calculate_response_metrics(self, activities: List[Dict], notes: List[Dict]) -> Dict:
         """
         Calcular métricas de resposta dos leads
@@ -974,6 +1167,9 @@ class KommoActivityETL:
                     contact_type = self.classify_contact_type(task, 'task')
                     task_types_count[contact_type] = task_types_count.get(contact_type, 0) + 1
                     
+                    # Segmentar follow-ups usando a nova função inteligente
+                    follow_up_segmentation = self.segment_follow_ups(task, 'task')
+                    
                     activity_records.append({
                         'activity_id': f"task_{task.get('id')}",
                         'activity_type': 'task',
@@ -991,6 +1187,12 @@ class KommoActivityETL:
                         'note_text': task.get('text', ''),
                         'complete_till': datetime.fromtimestamp(complete_till) if complete_till else None,
                         'completed_at': datetime.fromtimestamp(completed_at) if completed_at else None,
+                        'is_follow_up': follow_up_segmentation['is_follow_up'],
+                        'follow_up_type': follow_up_segmentation.get('follow_up_type'),
+                        'follow_up_category': follow_up_segmentation.get('follow_up_category'),
+                        'temporal_context': follow_up_segmentation.get('temporal_context'),
+                        'intensity': follow_up_segmentation.get('intensity'),
+                        'urgency_score': follow_up_segmentation.get('urgency_score', 5),
                         'source': 'tasks_api',
                         'updated_at': datetime.now()
                     })
@@ -1005,6 +1207,9 @@ class KommoActivityETL:
                     if not note.get('responsible_user_id'):
                         continue
                         
+                    # Segmentar follow-ups usando a nova função inteligente
+                    follow_up_segmentation = self.segment_follow_ups(note, 'note')
+                    
                     activity_records.append({
                         'activity_id': f"note_{note.get('id')}",
                         'activity_type': 'note',
@@ -1019,6 +1224,12 @@ class KommoActivityETL:
                         'is_successful': True,
                         'is_completed': True,  # Notas são sempre consideradas completas
                         'note_text': note.get('params', {}).get('text', ''),
+                        'is_follow_up': follow_up_segmentation['is_follow_up'],
+                        'follow_up_type': follow_up_segmentation.get('follow_up_type'),
+                        'follow_up_category': follow_up_segmentation.get('follow_up_category'),
+                        'temporal_context': follow_up_segmentation.get('temporal_context'),
+                        'intensity': follow_up_segmentation.get('intensity'),
+                        'urgency_score': follow_up_segmentation.get('urgency_score', 5),
                         'source': 'notes_api',
                         'updated_at': datetime.now()
                     })
@@ -1130,6 +1341,11 @@ class KommoActivityETL:
                 avg_response_time_hours DECIMAL(8,2) DEFAULT 0.00,
                 lead_responded BOOLEAN DEFAULT FALSE,
                 is_follow_up BOOLEAN DEFAULT FALSE,
+                follow_up_type VARCHAR(50) NULL,
+                follow_up_category VARCHAR(50) NULL,
+                temporal_context VARCHAR(50) NULL,
+                intensity VARCHAR(20) NULL,
+                urgency_score INT DEFAULT 5,
                 task_type_id INT NULL,
                 event_type VARCHAR(50) NULL,
                 source VARCHAR(50) DEFAULT 'kommo_api',
@@ -1168,8 +1384,9 @@ class KommoActivityETL:
                 duration_seconds, is_successful, is_completed, is_completed_on_time,
                 note_text, complete_till, completed_at, contacts_sent,
                 responses_received, response_rate, avg_response_time_hours,
+                is_follow_up, follow_up_type, follow_up_category, temporal_context, intensity, urgency_score,
                 source, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 is_successful = VALUES(is_successful),
                 is_completed = VALUES(is_completed),
@@ -1202,6 +1419,12 @@ class KommoActivityETL:
                     int(row['responses_received']) if pd.notna(row.get('responses_received')) else None,
                     float(row['response_rate']) if pd.notna(row.get('response_rate')) else None,
                     float(row['avg_response_time_hours']) if pd.notna(row.get('avg_response_time_hours')) else None,
+                    bool(row.get('is_follow_up', False)),
+                    row.get('follow_up_type'),
+                    row.get('follow_up_category'),
+                    row.get('temporal_context'),
+                    row.get('intensity'),
+                    int(row.get('urgency_score', 5)) if pd.notna(row.get('urgency_score')) else 5,
                     row.get('source', ''),
                     row['updated_at']
                 ))
@@ -1507,10 +1730,10 @@ class KommoActivityETL:
             
             ranking = cursor.fetchall()
             
-            logger.info("\n📊 RANKING POR ATIVIDADE:")
+            logger.info("\n RANKING POR ATIVIDADE:")
             for i, (name, contacts, calls, meetings, response, compliance) in enumerate(ranking[:5], 1):
                 logger.info(f"{i}º {name}: {contacts} contatos, {calls} ligações, {meetings} reuniões")
-                logger.info(f"   📈 {response:.1f}% resposta, {compliance:.1f}% compliance follow-ups")
+                logger.info(f"    {response:.1f}% resposta, {compliance:.1f}% compliance follow-ups")
             
             # 2. Análise de tipos de contato
             cursor.execute("""
@@ -1545,7 +1768,7 @@ class KommoActivityETL:
             
             daily_activity = cursor.fetchall()
             
-            logger.info("\n📅 ATIVIDADE POR DIA DA SEMANA:")
+            logger.info("\n ATIVIDADE POR DIA DA SEMANA:")
             for day, activities, users in daily_activity:
                 logger.info(f"{day}: {activities} atividades, {users} usuários ativos")
             
@@ -1567,7 +1790,7 @@ class KommoActivityETL:
             
             followup_compliance = cursor.fetchall()
             
-            logger.info("\n⏰ COMPLIANCE DE FOLLOW-UPS:")
+            logger.info("\n COMPLIANCE DE FOLLOW-UPS:")
             for name, total, on_time, rate in followup_compliance:
                 logger.info(f"{name}: {on_time}/{total} no prazo ({rate}%)")
             
