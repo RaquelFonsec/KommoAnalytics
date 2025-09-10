@@ -1500,88 +1500,132 @@ with col2:
         })
         st.dataframe(top_canais_display, width='stretch')
 
-# SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST)
+# SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST) - CORRIGIDO
 st.header("🔮 Módulo 6: Previsibilidade (Forecast)")
 st.markdown("**Forecast de receita (previsto vs. realizado) para antecipar gargalos antes de fechar o mês**")
 
-# Buscar forecast baseado nos dados dos Módulos 1 a 5
-forecast_query = f"""
-SELECT 
-    mes_ano,
-    data_previsao,
-    meta_receita,
-    previsao_receita,
-    previsao_leads,
-    previsao_win_rate,
-    previsao_ticket_medio
-FROM monthly_forecasts 
-WHERE mes_ano = DATE_FORMAT('{selected_date}', '%Y-%m')
-ORDER BY data_previsao DESC
-LIMIT 1
-"""
 
-forecast_df = run_query(forecast_query)
+# CORREÇÃO 1: Calcular forecast dinâmico baseado no filtro selecionado
+forecast_df = pd.DataFrame()
+
+try:
+    # Calcular dados dinâmicos baseados no período selecionado
+    forecast_query = f"""
+    SELECT 
+        DATE_FORMAT('{selected_date}', '%Y-%m') as mes_ano,
+        NOW() as data_previsao,
+        0 as meta_receita,  -- Meta será calculada dinamicamente
+        COALESCE(SUM(CASE WHEN sm.status_name = 'Venda ganha' THEN sm.sale_price ELSE 0 END), 0) as previsao_receita,
+        COUNT(DISTINCT l.lead_id) as previsao_leads,
+        COALESCE(ROUND(COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) / 
+              NULLIF(COUNT(DISTINCT CASE WHEN sm.status_name IN ('Venda ganha', 'Venda perdida') THEN sm.lead_id END), 0) * 100, 1), 0) as previsao_win_rate,
+        COALESCE(AVG(CASE WHEN sm.status_name = 'Venda ganha' AND sm.sale_price > 0 THEN sm.sale_price END), 0) as previsao_ticket_medio
+    FROM leads_metrics l
+    LEFT JOIN sales_metrics sm ON l.lead_id = sm.lead_id
+    WHERE l.created_date >= '{data_inicio.date()}'
+    """
+    forecast_df = run_query(forecast_query)
+    
+    # Se não houver dados, buscar dados do mês mais recente da tabela monthly_forecasts
+    if forecast_df.empty or forecast_df.iloc[0]['previsao_leads'] == 0:
+        forecast_query_fallback = """
+        SELECT 
+            mes_ano,
+            data_previsao,
+            meta_receita,
+            previsao_receita,
+            previsao_leads,
+            previsao_win_rate,
+            previsao_ticket_medio
+        FROM monthly_forecasts 
+        ORDER BY mes_ano DESC, data_previsao DESC
+        LIMIT 1
+        """
+        forecast_df = run_query(forecast_query_fallback)
+        
+        if not forecast_df.empty:
+            st.info(f"ℹ️ Exibindo dados de forecast do mês mais recente: {forecast_df.iloc[0]['mes_ano']}")
+
+except Exception as e:
+    st.error(f"❌ Erro ao buscar dados de forecast: {e}")
+    forecast_df = pd.DataFrame()
 
 # Buscar resultados reais baseados nos dados dos Módulos 1 a 5
-results_query = f"""
-SELECT 
-    DATE_FORMAT('{selected_date}', '%Y-%m') as mes_ano,
-    NOW() as data_atualizacao,
-    SUM(CASE WHEN sm.status_name = 'Venda ganha' THEN sm.sale_price ELSE 0 END) as receita_realizada,
-    COUNT(DISTINCT l.lead_id) as leads_realizados,
-    COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) as vendas_fechadas,
-    COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda perdida' THEN sm.lead_id END) as vendas_perdidas,
-    ROUND(COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) / 
-          NULLIF(COUNT(DISTINCT CASE WHEN sm.status_name IN ('Venda ganha', 'Venda perdida') THEN sm.lead_id END), 0) * 100, 1) as win_rate_real,
-    AVG(CASE WHEN sm.status_name = 'Venda ganha' THEN sm.sale_price END) as ticket_medio_real,
-    DATEDIFF('{selected_date}', DATE_FORMAT('{selected_date}', '%Y-%m-01')) + 1 as dias_passados,
-    DATEDIFF(LAST_DAY('{selected_date}'), '{selected_date}') as dias_restantes
-FROM leads_metrics l
-LEFT JOIN sales_metrics sm ON l.lead_id = sm.lead_id
-WHERE l.created_date >= DATE_FORMAT('{selected_date}', '%Y-%m-01')
-AND l.created_date <= LAST_DAY('{selected_date}')
-"""
-
-results_df = run_query(results_query)
+try:
+    results_query = f"""
+    SELECT 
+        DATE_FORMAT('{selected_date}', '%Y-%m') as mes_ano,
+        NOW() as data_atualizacao,
+        COALESCE(SUM(CASE WHEN sm.status_name = 'Venda ganha' THEN sm.sale_price ELSE 0 END), 0) as receita_realizada,
+        COUNT(DISTINCT l.lead_id) as leads_realizados,
+        COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) as vendas_fechadas,
+        COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda perdida' THEN sm.lead_id END) as vendas_perdidas,
+        COALESCE(ROUND(COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) / 
+              NULLIF(COUNT(DISTINCT CASE WHEN sm.status_name IN ('Venda ganha', 'Venda perdida') THEN sm.lead_id END), 0) * 100, 1), 0) as win_rate_real,
+        COALESCE(AVG(CASE WHEN sm.status_name = 'Venda ganha' AND sm.sale_price > 0 THEN sm.sale_price END), 0) as ticket_medio_real,
+        DATEDIFF('{selected_date}', DATE_FORMAT('{selected_date}', '%Y-%m-01')) + 1 as dias_passados,
+        DATEDIFF(LAST_DAY('{selected_date}'), '{selected_date}') as dias_restantes
+    FROM leads_metrics l
+    LEFT JOIN sales_metrics sm ON l.lead_id = sm.lead_id
+    WHERE l.created_date >= DATE_FORMAT('{selected_date}', '%Y-%m-01')
+    AND l.created_date <= LAST_DAY('{selected_date}')
+    """
+    results_df = run_query(results_query)
+except Exception as e:
+    st.error(f"❌ Erro ao buscar resultados: {e}")
+    results_df = pd.DataFrame()
 
 # Buscar gaps e gargalos baseados nos dados dos Módulos 1 a 5
-gaps_query = f"""
-SELECT 
-    mes_ano,
-    data_analise,
-    gap_receita,
-    gap_leads,
-    gap_win_rate,
-    gap_ticket_medio,
-    receita_necessaria_diaria,
-    leads_necessarios_diarios,
-    win_rate_necessario,
-    ticket_medio_necessario,
-    risco_meta,
-    alertas,
-    acoes_recomendadas
-FROM forecast_gaps 
-WHERE mes_ano = DATE_FORMAT('{selected_date}', '%Y-%m')
-ORDER BY data_analise DESC
-LIMIT 1
-"""
+try:
+    gaps_query = f"""
+    SELECT 
+        mes_ano,
+        data_analise,
+        gap_receita,
+        gap_leads,
+        gap_win_rate,
+        gap_ticket_medio,
+        receita_necessaria_diaria,
+        leads_necessarios_diarios,
+        win_rate_necessario,
+        ticket_medio_necessario,
+        risco_meta,
+        alertas,
+        acoes_recomendadas
+    FROM forecast_gaps 
+    WHERE mes_ano = DATE_FORMAT('{selected_date}', '%Y-%m')
+    ORDER BY data_analise DESC
+    LIMIT 1
+    """
+    gaps_df = run_query(gaps_query)
+except Exception as e:
+    st.error(f"❌ Erro ao buscar gaps: {e}")
+    gaps_df = pd.DataFrame()
 
-gaps_df = run_query(gaps_query)
+# CORREÇÃO 2: Função para tratamento seguro de valores
+def safe_value(df, row_index, column, default=0):
+    """Função para extrair valores de forma segura, tratando None e tipos diferentes"""
+    try:
+        if df.empty or row_index >= len(df):
+            return default
+        value = df.iloc[row_index].get(column, default)
+        if value is None or pd.isna(value):
+            return default
+        return float(value) if isinstance(default, (int, float)) else value
+    except:
+        return default
 
 # Métricas principais do Módulo 6 - Forecast vs Realizado
 col1, col2, col3, col4 = st.columns(4)
 
 if not forecast_df.empty and not results_df.empty:
-    forecast = forecast_df.iloc[0]
-    results = results_df.iloc[0]
-    
-    # Verificar se os valores não são None e definir valores padrão
-    meta_receita = forecast.get('meta_receita', 0) or 0
-    receita_realizada = results.get('receita_realizada', 0) or 0
-    win_rate_real = results.get('win_rate_real', 0) or 0
-    previsao_win_rate = forecast.get('previsao_win_rate', 0) or 0
-    dias_restantes = results.get('dias_restantes', 0) or 0
-    dias_passados = results.get('dias_passados', 0) or 0
+    # CORREÇÃO 3: Usar função segura para extrair valores
+    meta_receita = safe_value(forecast_df, 0, 'meta_receita', 0)
+    receita_realizada = safe_value(results_df, 0, 'receita_realizada', 0)
+    win_rate_real = safe_value(results_df, 0, 'win_rate_real', 0)
+    previsao_win_rate = safe_value(forecast_df, 0, 'previsao_win_rate', 0)
+    dias_restantes = safe_value(results_df, 0, 'dias_restantes', 0)
+    dias_passados = safe_value(results_df, 0, 'dias_passados', 0)
     
     with col1:
         st.metric(
@@ -1609,8 +1653,8 @@ if not forecast_df.empty and not results_df.empty:
     with col4:
         st.metric(
             "⏰ Dias Restantes", 
-            f"{dias_restantes}", 
-            f"de {dias_passados} passados"
+            f"{int(dias_restantes)}", 
+            f"de {int(dias_passados)} passados"
         )
 else:
     # Mostrar mensagem quando não há dados
@@ -1627,27 +1671,25 @@ else:
 st.subheader("⚠️ Análise de Gaps para Fechamento do Mês")
 
 if not gaps_df.empty:
-    gaps = gaps_df.iloc[0]
-    
-    # Verificar se os valores não são None e definir valores padrão
-    risco_meta = gaps.get('risco_meta', 'baixo') or 'baixo'
-    alertas = gaps.get('alertas', 'Sem dados') or 'Sem dados'
-    acoes_recomendadas = gaps.get('acoes_recomendadas', 'Sem dados') or 'Sem dados'
-    receita_necessaria_diaria = gaps.get('receita_necessaria_diaria', 0) or 0
-    leads_necessarios_diarios = gaps.get('leads_necessarios_diarios', 0) or 0
-    win_rate_necessario = gaps.get('win_rate_necessario', 0) or 0
-    ticket_medio_necessario = gaps.get('ticket_medio_necessario', 0) or 0
+    # Usar função segura para extrair valores dos gaps
+    risco_meta = safe_value(gaps_df, 0, 'risco_meta', 'baixo')
+    alertas = safe_value(gaps_df, 0, 'alertas', 'Nenhum alerta')
+    acoes_recomendadas = safe_value(gaps_df, 0, 'acoes_recomendadas', 'Manter estratégia atual')
+    receita_necessaria_diaria = safe_value(gaps_df, 0, 'receita_necessaria_diaria', 0)
+    leads_necessarios_diarios = safe_value(gaps_df, 0, 'leads_necessarios_diarios', 0)
+    win_rate_necessario = safe_value(gaps_df, 0, 'win_rate_necessario', 0)
+    ticket_medio_necessario = safe_value(gaps_df, 0, 'ticket_medio_necessario', 0)
     
     # Alertas de risco
     risco_color = {
-        'baixo': 'green',
-        'medio': 'orange', 
-        'alto': 'red',
-        'critico': 'darkred'
+        'baixo': '#28a745',      # Verde
+        'medio': '#ffc107',      # Amarelo  
+        'alto': '#fd7e14',       # Laranja
+        'critico': '#dc3545'     # Vermelho
     }
     
     st.markdown(f"""
-    <div style="padding: 1rem; border-radius: 0.5rem; background-color: {risco_color.get(risco_meta, 'gray')}; color: white;">
+    <div style="padding: 1rem; border-radius: 0.5rem; background-color: {risco_color.get(risco_meta, '#6c757d')}; color: white; margin: 1rem 0;">
         <h4>🚨 Risco da Meta: {risco_meta.upper()}</h4>
         <p><strong>Alertas:</strong> {alertas}</p>
         <p><strong>Ações Recomendadas:</strong> {acoes_recomendadas}</p>
@@ -1661,28 +1703,28 @@ if not gaps_df.empty:
         st.metric(
             "💰 Receita Necessária/Dia",
             f"R$ {receita_necessaria_diaria:,.0f}",
-            f"para atingir meta"
+            "para atingir meta"
         )
     
     with col2:
         st.metric(
             "📊 Leads Necessários/Dia",
             f"{leads_necessarios_diarios:.0f}",
-            f"para atingir meta"
+            "para atingir meta"
         )
     
     with col3:
         st.metric(
             "🎯 Win Rate Necessário",
             f"{win_rate_necessario:.1f}%",
-            f"para atingir meta"
+            "para atingir meta"
         )
     
     with col4:
         st.metric(
             "💎 Ticket Médio Necessário",
             f"R$ {ticket_medio_necessario:,.0f}",
-            f"para atingir meta"
+            "para atingir meta"
         )
 else:
     st.warning("⚠️ Não há dados de gaps disponíveis para o período selecionado.")
@@ -1694,13 +1736,10 @@ col1, col2 = st.columns(2)
 
 with col1:
     if not forecast_df.empty and not results_df.empty:
-        forecast = forecast_df.iloc[0]
-        results = results_df.iloc[0]
-        
-        # Verificar se os valores não são None e definir valores padrão
-        meta_receita = forecast.get('meta_receita', 0) or 0
-        previsao_receita = forecast.get('previsao_receita', 0) or 0
-        receita_realizada = results.get('receita_realizada', 0) or 0
+        # Usar função segura para extrair valores
+        meta_receita = safe_value(forecast_df, 0, 'meta_receita', 0)
+        previsao_receita = safe_value(forecast_df, 0, 'previsao_receita', 0)
+        receita_realizada = safe_value(results_df, 0, 'receita_realizada', 0)
         
         # Gráfico de barras comparativo
         fig_comparativo = go.Figure()
@@ -1710,179 +1749,179 @@ with col1:
             name='Meta',
             x=['Receita'],
             y=[meta_receita],
-            marker_color='red'
+            marker_color='#dc3545',
+            text=[f'R$ {meta_receita:,.0f}'],
+            textposition='outside'
         ))
         
         fig_comparativo.add_trace(go.Bar(
             name='Previsto',
             x=['Receita'],
             y=[previsao_receita],
-            marker_color='orange'
+            marker_color='#fd7e14',
+            text=[f'R$ {previsao_receita:,.0f}'],
+            textposition='outside'
         ))
         
         fig_comparativo.add_trace(go.Bar(
             name='Realizado',
             x=['Receita'],
             y=[receita_realizada],
-            marker_color='green'
+            marker_color='#28a745',
+            text=[f'R$ {receita_realizada:,.0f}'],
+            textposition='outside'
         ))
         
         fig_comparativo.update_layout(
             title="💰 Receita: Meta vs Previsto vs Realizado",
             yaxis_title="Valor (R$)",
-            barmode='group'
+            barmode='group',
+            height=400
         )
         
-        st.plotly_chart(fig_comparativo, width='stretch')
+        st.plotly_chart(fig_comparativo, use_container_width=True)
     else:
         st.warning("⚠️ Não há dados suficientes para gerar o gráfico de comparação.")
-    
-    with col2:
-        if not forecast_df.empty and not results_df.empty:
-            forecast = forecast_df.iloc[0]
-            results = results_df.iloc[0]
-            
-            # Verificar se os valores não são None e definir valores padrão
-            previsao_win_rate = forecast.get('previsao_win_rate', 0) or 0
-            win_rate_real = results.get('win_rate_real', 0) or 0
-            previsao_ticket_medio = forecast.get('previsao_ticket_medio', 0) or 0
-            ticket_medio_real = results.get('ticket_medio_real', 0) or 0
-            
-            # Gráfico de Win Rate e Ticket Médio
-            fig_metrics = go.Figure()
-            
-            # Win Rate
-            fig_metrics.add_trace(go.Bar(
-                name='Win Rate Previsto',
-                x=['Win Rate'],
-                y=[previsao_win_rate],
-                marker_color='lightblue'
-            ))
-            
-            fig_metrics.add_trace(go.Bar(
-                name='Win Rate Real',
-                x=['Win Rate'],
-                y=[win_rate_real],
-                marker_color='blue'
-            ))
-            
-            # Ticket Médio
-            fig_metrics.add_trace(go.Bar(
-                name='Ticket Previsto',
-                x=['Ticket Médio'],
-                y=[previsao_ticket_medio],
-                marker_color='lightgreen'
-            ))
-            
-            fig_metrics.add_trace(go.Bar(
-                name='Ticket Real',
-                x=['Ticket Médio'],
-                y=[ticket_medio_real],
-                marker_color='green'
-            ))
-            
-            fig_metrics.update_layout(
-                title="📊 Win Rate e Ticket Médio: Previsto vs Realizado",
-                yaxis_title="Valor (%) / (R$)",
-                barmode='group'
-            )
-            
-            st.plotly_chart(fig_metrics, width='stretch')
+
+with col2:
+    if not forecast_df.empty and not results_df.empty:
+        # Usar função segura para extrair valores
+        previsao_win_rate = safe_value(forecast_df, 0, 'previsao_win_rate', 0)
+        win_rate_real = safe_value(results_df, 0, 'win_rate_real', 0)
+        previsao_ticket_medio = safe_value(forecast_df, 0, 'previsao_ticket_medio', 0)
+        ticket_medio_real = safe_value(results_df, 0, 'ticket_medio_real', 0)
+        
+        # Gráfico de Win Rate e Ticket Médio
+        fig_metrics = go.Figure()
+        
+        # Win Rate
+        fig_metrics.add_trace(go.Bar(
+            name='Win Rate Previsto',
+            x=['Win Rate (%)'],
+            y=[previsao_win_rate],
+            marker_color='#17a2b8',
+            text=[f'{previsao_win_rate:.1f}%'],
+            textposition='outside'
+        ))
+        
+        fig_metrics.add_trace(go.Bar(
+            name='Win Rate Real',
+            x=['Win Rate (%)'],
+            y=[win_rate_real],
+            marker_color='#007bff',
+            text=[f'{win_rate_real:.1f}%'],
+            textposition='outside'
+        ))
+        
+        # Ticket Médio (escala ajustada)
+        ticket_scale = 100  # Escalar para visualização
+        fig_metrics.add_trace(go.Bar(
+            name='Ticket Previsto',
+            x=['Ticket Médio (x100)'],
+            y=[previsao_ticket_medio / ticket_scale],
+            marker_color='#20c997',
+            text=[f'R$ {previsao_ticket_medio:,.0f}'],
+            textposition='outside'
+        ))
+        
+        fig_metrics.add_trace(go.Bar(
+            name='Ticket Real',
+            x=['Ticket Médio (x100)'],
+            y=[ticket_medio_real / ticket_scale],
+            marker_color='#28a745',
+            text=[f'R$ {ticket_medio_real:,.0f}'],
+            textposition='outside'
+        ))
+        
+        fig_metrics.update_layout(
+            title="📊 Win Rate e Ticket Médio: Previsto vs Realizado",
+            yaxis_title="Valor",
+            barmode='group',
+            height=400
+        )
+        
+        st.plotly_chart(fig_metrics, use_container_width=True)
 
 # Resumo Executivo do Forecast
 st.subheader("📋 Resumo Executivo do Forecast")
 
-if not forecast_df.empty and not results_df.empty and not gaps_df.empty:
-    forecast = forecast_df.iloc[0]
-    results = results_df.iloc[0]
-    gaps = gaps_df.iloc[0]
-    
+if not forecast_df.empty and not results_df.empty:
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("**🎯 METAS E PREVISÕES:**")
-        st.markdown(f"- **Meta de Receita:** R$ {forecast.get('meta_receita', 0) or 0:,.2f}")
-        st.markdown(f"- **Previsão de Receita:** R$ {forecast.get('previsao_receita', 0) or 0:,.2f}")
-        st.markdown(f"- **Previsão de Leads:** {forecast.get('previsao_leads', 0) or 0:,}")
-        st.markdown(f"- **Win Rate Esperado:** {forecast.get('previsao_win_rate', 0) or 0:.1f}%")
-        st.markdown(f"- **Ticket Médio Esperado:** R$ {forecast.get('previsao_ticket_medio', 0) or 0:,.2f}")
+        meta_receita = safe_value(forecast_df, 0, 'meta_receita', 0)
+        previsao_receita = safe_value(forecast_df, 0, 'previsao_receita', 0)
+        previsao_leads = safe_value(forecast_df, 0, 'previsao_leads', 0)
+        previsao_win_rate = safe_value(forecast_df, 0, 'previsao_win_rate', 0)
+        previsao_ticket_medio = safe_value(forecast_df, 0, 'previsao_ticket_medio', 0)
+        
+        st.markdown(f"- **Meta de Receita:** R$ {meta_receita:,.2f}")
+        st.markdown(f"- **Previsão de Receita:** R$ {previsao_receita:,.2f}")
+        st.markdown(f"- **Previsão de Leads:** {int(previsao_leads):,}")
+        st.markdown(f"- **Win Rate Esperado:** {previsao_win_rate:.1f}%")
+        st.markdown(f"- **Ticket Médio Esperado:** R$ {previsao_ticket_medio:,.2f}")
     
     with col2:
         st.markdown("**📊 RESULTADOS ATUAIS:**")
-        st.markdown(f"- **Receita Realizada:** R$ {results.get('receita_realizada', 0) or 0:,.2f}")
-        st.markdown(f"- **Leads Realizados:** {results.get('leads_realizados', 0) or 0:,}")
-        st.markdown(f"- **Vendas Fechadas:** {results.get('vendas_fechadas', 0) or 0}")
-        st.markdown(f"- **Win Rate Real:** {results.get('win_rate_real', 0) or 0:.1f}%")
-        st.markdown(f"- **Ticket Médio Real:** R$ {results.get('ticket_medio_real', 0) or 0:,.2f}")
-        st.markdown(f"- **Dias Restantes:** {results.get('dias_restantes', 0) or 0}")
+        receita_realizada = safe_value(results_df, 0, 'receita_realizada', 0)
+        leads_realizados = safe_value(results_df, 0, 'leads_realizados', 0)
+        vendas_fechadas = safe_value(results_df, 0, 'vendas_fechadas', 0)
+        win_rate_real = safe_value(results_df, 0, 'win_rate_real', 0)
+        ticket_medio_real = safe_value(results_df, 0, 'ticket_medio_real', 0)
+        dias_restantes = safe_value(results_df, 0, 'dias_restantes', 0)
+        
+        st.markdown(f"- **Receita Realizada:** R$ {receita_realizada:,.2f}")
+        st.markdown(f"- **Leads Realizados:** {int(leads_realizados):,}")
+        st.markdown(f"- **Vendas Fechadas:** {int(vendas_fechadas)}")
+        st.markdown(f"- **Win Rate Real:** {win_rate_real:.1f}%")
+        st.markdown(f"- **Ticket Médio Real:** R$ {ticket_medio_real:,.2f}")
+        st.markdown(f"- **Dias Restantes:** {int(dias_restantes)}")
 
 # Análise de Performance
 st.subheader("📈 Análise de Performance")
 
 if not gaps_df.empty:
-    gaps = gaps_df.iloc[0]
-    
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("**📊 GAPS IDENTIFICADOS:**")
-        st.markdown(f"- **Gap de Receita:** R$ {gaps.get('gap_receita', 0) or 0:,.2f}")
-        st.markdown(f"- **Gap de Leads:** {gaps.get('gap_leads', 0) or 0}")
-        st.markdown(f"- **Gap de Win Rate:** {gaps.get('gap_win_rate', 0) or 0:.1f}%")
-        st.markdown(f"- **Gap de Ticket Médio:** R$ {gaps.get('gap_ticket_medio', 0) or 0:,.2f}")
+        gap_receita = safe_value(gaps_df, 0, 'gap_receita', 0)
+        gap_leads = safe_value(gaps_df, 0, 'gap_leads', 0)
+        gap_win_rate = safe_value(gaps_df, 0, 'gap_win_rate', 0)
+        gap_ticket_medio = safe_value(gaps_df, 0, 'gap_ticket_medio', 0)
+        
+        st.markdown(f"- **Gap de Receita:** R$ {gap_receita:,.2f}")
+        st.markdown(f"- **Gap de Leads:** {gap_leads:.0f}")
+        st.markdown(f"- **Gap de Win Rate:** {gap_win_rate:.1f}%")
+        st.markdown(f"- **Gap de Ticket Médio:** R$ {gap_ticket_medio:,.2f}")
     
     with col2:
         st.markdown("**🎯 NECESSIDADES PARA ATINGIR META:**")
-        st.markdown(f"- **Receita/Dia:** R$ {gaps.get('receita_necessaria_diaria', 0) or 0:,.0f}")
-        st.markdown(f"- **Leads/Dia:** {gaps.get('leads_necessarios_diarios', 0) or 0:.0f}")
-        st.markdown(f"- **Win Rate:** {gaps.get('win_rate_necessario', 0) or 0:.1f}%")
-        st.markdown(f"- **Ticket Médio:** R$ {gaps.get('ticket_medio_necessario', 0) or 0:,.0f}")
+        receita_necessaria_diaria = safe_value(gaps_df, 0, 'receita_necessaria_diaria', 0)
+        leads_necessarios_diarios = safe_value(gaps_df, 0, 'leads_necessarios_diarios', 0)
+        win_rate_necessario = safe_value(gaps_df, 0, 'win_rate_necessario', 0)
+        ticket_medio_necessario = safe_value(gaps_df, 0, 'ticket_medio_necessario', 0)
+        
+        st.markdown(f"- **Receita/Dia:** R$ {receita_necessaria_diaria:,.0f}")
+        st.markdown(f"- **Leads/Dia:** {leads_necessarios_diarios:.0f}")
+        st.markdown(f"- **Win Rate:** {win_rate_necessario:.1f}%")
+        st.markdown(f"- **Ticket Médio:** R$ {ticket_medio_necessario:,.0f}")
 
 # Alertas Automáticos
 st.subheader("🚨 Alertas Automáticos")
 
 if not gaps_df.empty:
-    gaps = gaps_df.iloc[0]
+    risco_meta = safe_value(gaps_df, 0, 'risco_meta', 'baixo')
     
-    if gaps.get('risco_meta') == 'critico':
+    if risco_meta == 'critico':
         st.error("🚨 **ALERTA CRÍTICO**: Risco alto de não atingir a meta! Ações imediatas necessárias.")
-    elif gaps.get('risco_meta') == 'alto':
+    elif risco_meta == 'alto':
         st.warning("⚠️ **ALERTA ALTO**: Risco moderado de não atingir a meta. Acompanhamento intensivo necessário.")
-    elif gaps.get('risco_meta') == 'medio':
+    elif risco_meta == 'medio':
         st.info("ℹ️ **ALERTA MÉDIO**: Risco baixo, mas atenção aos gaps identificados.")
     else:
         st.success("✅ **STATUS OK**: Meta em dia, mantendo performance atual.")
-
-# Buscar dados de segmentação dos follow-ups para integrar na tabela principal
-followup_segmentation_query = f"""
-SELECT 
-    user_name,
-    COUNT(*) as total_followups,
-    COUNT(CASE WHEN follow_up_category = 'alta_prioridade' THEN 1 END) as alta_prioridade,
-    COUNT(CASE WHEN follow_up_category = 'media_prioridade' THEN 1 END) as media_prioridade,
-    COUNT(CASE WHEN follow_up_category = 'baixa_prioridade' THEN 1 END) as baixa_prioridade,
-    AVG(urgency_score) as score_medio_urgencia
-FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}' AND is_follow_up = 1
-GROUP BY user_name
-"""
-
-followup_segmentation_df = run_query(followup_segmentation_query)
-
-# Buscar dados de taxa de resposta e follow-ups no prazo
-response_metrics_query = f"""
-SELECT 
-    user_name,
-    COUNT(CASE WHEN activity_type = 'note' AND note_text LIKE '%resposta%' OR note_text LIKE '%retorno%' THEN 1 END) as respostas_recebidas,
-    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till >= created_date THEN 1 END) as followups_no_prazo,
-    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till < created_date THEN 1 END) as followups_atrasados
-FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
-GROUP BY user_name
-"""
-
-response_metrics_df = run_query(response_metrics_query)
-
-
-
+else:
+    st.info("ℹ️ **Sem dados de risco:** Execute o ETL para gerar análise de gaps.")
 
