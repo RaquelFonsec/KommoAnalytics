@@ -2,12 +2,9 @@
 # Script de backup automático do banco de dados Kommo Analytics
 # Executa backup diário às 2h da manhã
 
-PROJECT_DIR="/home/raquel-fonseca/Projects/KommoAnalytics"
+PROJECT_DIR="/app"
 BACKUP_DIR="$PROJECT_DIR/BACKUP"
 LOG_DIR="$PROJECT_DIR/LOGS"
-
-# Carregar variáveis de ambiente
-source "$PROJECT_DIR/env_template.txt"
 
 # Criar diretórios se não existirem
 mkdir -p "$BACKUP_DIR"

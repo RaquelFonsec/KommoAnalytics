@@ -2061,7 +2061,7 @@ class KommoActivityETL:
         try:
             # Definir período padrão (últimos 60 dias para capturar mais dados)
             if not start_date:
-                start_date = datetime.now() - timedelta(days=30)
+                start_date = datetime.now() - timedelta(days=90)
                 start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
             
             if not end_date:

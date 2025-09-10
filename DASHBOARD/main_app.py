@@ -63,9 +63,14 @@ st.title(" Kommo Analytics Dashboard -")
 
 # Sidebar
 st.sidebar.title(" Filtros")
-periodo = st.sidebar.selectbox("Período:", ["7 dias", "15 dias", "30 dias"], index=2)  # 30 dias por padrão
-dias = int(periodo.split()[0])
-data_inicio = datetime.now() - timedelta(days=dias)
+periodo = st.sidebar.selectbox("Período:", ["7 dias", "15 dias", "30 dias", "60 dias", "90 dias", "Todos os dados"], index=2)  # 30 dias por padrão
+
+# Definir data de início baseada no período selecionado
+if periodo == "Todos os dados":
+    data_inicio = datetime(2025, 1, 1)  # Data muito antiga para pegar todos os dados
+else:
+    dias = int(periodo.split()[0])
+    data_inicio = datetime.now() - timedelta(days=dias)
 
 # Data para queries
 selected_date = datetime.now().strftime('%Y-%m-%d')
@@ -79,8 +84,8 @@ col1, col2, col3, col4 = st.columns(4)
 kpis_query = f"""
 SELECT 
     COUNT(DISTINCT l.lead_id) as total_leads,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda ganha' THEN fh.lead_id END) as vendas,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda perdida' THEN fh.lead_id END) as vendas_perdidas,
+    COUNT(DISTINCT CASE WHEN fh.status_name = 'Negócio Fechado' THEN fh.lead_id END) as vendas,
+    COUNT(DISTINCT CASE WHEN fh.status_name = 'Negócio perdido' THEN fh.lead_id END) as vendas_perdidas,
     COALESCE(AVG(l.response_time_hours), 0) as tempo_resposta_medio,
     COALESCE(SUM(l.lead_cost), 0) as custo_total
 FROM leads_metrics l
@@ -197,8 +202,8 @@ st.subheader("📋 Detalhamento por Canal")
 if not leads_canal_df.empty:
     # Formatar dados para exibição
     canais_display = leads_canal_df.copy()
-    canais_display['tempo_resposta_medio'] = canais_display['tempo_resposta_medio'].round(1)
-    canais_display['custo_medio'] = canais_display['custo_medio'].round(2)
+    canais_display['tempo_resposta_medio'] = pd.to_numeric(canais_display['tempo_resposta_medio'], errors='coerce').round(1)
+    canais_display['custo_medio'] = pd.to_numeric(canais_display['custo_medio'], errors='coerce').round(2)
     canais_display['pct_total'] = (canais_display['total_leads'] / canais_display['total_leads'].sum() * 100).round(1)
     
     # Renomear colunas
@@ -280,11 +285,11 @@ vendas_canal_query = f"""
 SELECT 
     lm.primary_source as canal,
     COUNT(DISTINCT fh.lead_id) as vendas_ganhas,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda perdida' THEN fh.lead_id END) as vendas_perdidas
+    COUNT(DISTINCT CASE WHEN fh.status_name = 'Negócio perdido' THEN fh.lead_id END) as vendas_perdidas
 FROM funnel_history fh
 JOIN leads_metrics lm ON fh.lead_id = lm.lead_id
 WHERE fh.entry_date >= '{data_inicio.date()}'
-AND fh.status_name IN ('Venda ganha', 'Venda perdida')
+AND fh.status_name IN ('Negócio Fechado', 'Negócio perdido')
 GROUP BY lm.primary_source
 ORDER BY vendas_ganhas DESC
 """
@@ -505,7 +510,7 @@ with col3:
     st.metric("⏱️ Tempo Médio Etapa", f"{tempo_medio_etapa:.1f}h")
 
 with col4:
-    vendas_perdidas_principal = status_principal_df[status_principal_df['status_name'] == 'Venda perdida']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Venda perdida' in status_principal_df['status_name'].values else 0
+    vendas_perdidas_principal = status_principal_df[status_principal_df['status_name'] == 'Negócio perdido']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Negócio perdido' in status_principal_df['status_name'].values else 0
     st.metric("❌ Vendas Perdidas", f"{vendas_perdidas_principal:,}")
 
 # SEÇÃO 3.5: ANÁLISE DE VENDAS PERDIDAS
@@ -529,7 +534,7 @@ with col1:
         AVG(time_in_status_hours) as tempo_medio
     FROM funnel_history 
     WHERE pipeline_id = 11146887
-    AND status_name = 'Venda perdida'
+    AND status_name = 'Negócio perdido'
     AND entry_date >= '{data_inicio.date()}'
     GROUP BY tempo_categoria
     ORDER BY tempo_medio
@@ -555,7 +560,7 @@ with col2:
         AVG(time_in_status_hours) as tempo_medio
     FROM funnel_history 
     WHERE pipeline_id = 11146887
-    AND status_name IN ('Venda ganha', 'Venda perdida')
+    AND status_name IN ('Negócio Fechado', 'Negócio perdido')
     AND entry_date >= '{data_inicio.date()}'
     GROUP BY status_name
     """
@@ -575,11 +580,11 @@ with col2:
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    total_perdidas = comparacao_df[comparacao_df['status_name'] == 'Venda perdida']['leads'].iloc[0] if not comparacao_df.empty and 'Venda perdida' in comparacao_df['status_name'].values else 0
+    total_perdidas = comparacao_df[comparacao_df['status_name'] == 'Negócio perdido']['leads'].iloc[0] if not comparacao_df.empty and 'Negócio perdido' in comparacao_df['status_name'].values else 0
     st.metric("❌ Total Perdidas", f"{total_perdidas:,}")
 
 with col2:
-    total_ganhas = comparacao_df[comparacao_df['status_name'] == 'Venda ganha']['leads'].iloc[0] if not comparacao_df.empty and 'Venda ganha' in comparacao_df['status_name'].values else 0
+    total_ganhas = comparacao_df[comparacao_df['status_name'] == 'Negócio Fechado']['leads'].iloc[0] if not comparacao_df.empty and 'Negócio Fechado' in comparacao_df['status_name'].values else 0
     st.metric("✅ Total Ganhas", f"{total_ganhas:,}")
 
 with col3:
@@ -587,7 +592,7 @@ with col3:
     st.metric("📉 Taxa de Perda", f"{taxa_perda:.1f}%")
 
 with col4:
-    tempo_medio_perdidas = comparacao_df[comparacao_df['status_name'] == 'Venda perdida']['tempo_medio'].iloc[0] if not comparacao_df.empty and 'Venda perdida' in comparacao_df['status_name'].values else 0
+    tempo_medio_perdidas = comparacao_df[comparacao_df['status_name'] == 'Negócio perdido']['tempo_medio'].iloc[0] if not comparacao_df.empty and 'Negócio perdido' in comparacao_df['status_name'].values else 0
     st.metric("⏱️ Tempo até Perda", f"{tempo_medio_perdidas:.1f}h")
 
 # SEÇÃO 3.6: MOTIVOS DE PERDA
@@ -597,13 +602,14 @@ st.markdown("**Análise detalhada dos motivos de perda no funil**")
 # Buscar dados reais de motivos de perda
 motivos_perda_query = f"""
 SELECT 
-    COALESCE(loss_reason, 'Não especificado') as motivo,
+    COALESCE(loss_reason_name, 'Não especificado') as motivo,
     COUNT(DISTINCT lead_id) as leads_perdidos,
-    AVG(sales_cycle_days) as tempo_medio
-FROM sales_metrics 
-WHERE created_date >= '{data_inicio.date()}'
-AND status_name = 'Venda perdida'
-GROUP BY loss_reason
+    AVG(time_in_status_hours) as tempo_medio
+FROM funnel_history 
+WHERE entry_date >= '{data_inicio.date()}'
+AND pipeline_id = 11146887
+AND status_name = 'Negócio perdido'
+GROUP BY loss_reason_name
 ORDER BY leads_perdidos DESC
 """
 
@@ -667,7 +673,7 @@ st.subheader("📋 Detalhamento dos Motivos de Perda")
 if not motivos_perda_df.empty:
     # Formatar dados para exibição
     motivos_display = motivos_perda_df.copy()
-    motivos_display['tempo_medio'] = motivos_display['tempo_medio'].round(1)
+    motivos_display['tempo_medio'] = pd.to_numeric(motivos_display['tempo_medio'], errors='coerce').round(1)
     motivos_display['pct_total'] = (motivos_display['leads_perdidos'] / motivos_display['leads_perdidos'].sum() * 100).round(1)
     
     # Renomear colunas
