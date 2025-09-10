@@ -35,6 +35,10 @@ if ! grep -q "KOMMO_ACCOUNT_ID=" .env || grep -q "KOMMO_ACCOUNT_ID=seu_account_i
     exit 1
 fi
 
+# Configurar Streamlit para produção
+echo " Configurando Streamlit para produção..."
+./setup_streamlit_production.sh
+
 # Parar containers existentes
 echo " Parando containers existentes..."
 docker-compose -f docker-compose.prod.yml down
