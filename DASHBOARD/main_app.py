@@ -1729,6 +1729,62 @@ if not gaps_df.empty:
 else:
     st.warning("⚠️ Não há dados de gaps disponíveis para o período selecionado.")
 
+# CENÁRIOS DE FORECAST
+st.subheader("📊 Cenários de Receita")
+
+try:
+    scenarios_query = f"""
+    SELECT 
+        cenario,
+        previsao_receita,
+        probabilidade
+    FROM forecast_scenarios 
+    WHERE mes_ano = DATE_FORMAT('{selected_date}', '%Y-%m')
+    ORDER BY 
+        CASE cenario 
+            WHEN 'pessimista' THEN 1 
+            WHEN 'realista' THEN 2 
+            WHEN 'otimista' THEN 3 
+        END
+    """
+    scenarios_df = run_query(scenarios_query)
+    
+    if not scenarios_df.empty:
+        col1, col2, col3 = st.columns(3)
+        
+        for idx, scenario in scenarios_df.iterrows():
+            cenario = scenario['cenario']
+            valor = scenario['previsao_receita']
+            probabilidade = scenario['probabilidade']
+            
+            # Definir cores por cenário
+            colors = {
+                'pessimista': '#dc3545',  # Vermelho
+                'realista': '#28a745',    # Verde
+                'otimista': '#17a2b8'     # Azul
+            }
+            
+            # Definir emojis por cenário
+            emojis = {
+                'pessimista': '📉',
+                'realista': '📊',
+                'otimista': '📈'
+            }
+            
+            with [col1, col2, col3][idx]:
+                st.markdown(f"""
+                <div style="padding: 1rem; border-radius: 0.5rem; background-color: {colors.get(cenario, '#6c757d')}; color: white; text-align: center; margin: 0.5rem 0;">
+                    <h4>{emojis.get(cenario, '📊')} {cenario.capitalize()}</h4>
+                    <h3>R$ {valor:,.0f}</h3>
+                    <p>{probabilidade}% de probabilidade</p>
+                </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("ℹ️ Execute o ETL para gerar cenários de forecast.")
+        
+except Exception as e:
+    st.error(f"❌ Erro ao buscar cenários: {e}")
+
 # Comparação Previsto vs Realizado
 st.subheader("📊 Comparação Previsto vs Realizado")
 
