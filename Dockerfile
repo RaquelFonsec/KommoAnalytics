@@ -37,8 +37,7 @@ RUN mkdir -p /app/LOGS /app/BACKUP && \
 
 # Configurar permissões
 RUN chmod +x /app/AUTOMATION/*.sh && \
-    chmod +x /app/docker-entrypoint.sh && \
-    chmod +x /app/setup_cron.sh
+    chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER appuser
