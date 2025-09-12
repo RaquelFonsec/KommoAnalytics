@@ -33,7 +33,8 @@ COPY . .
 
 # Criar diretórios necessários
 RUN mkdir -p /app/LOGS /app/BACKUP && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod 755 /app/LOGS /app/BACKUP
 
 # Configurar permissões
 RUN chmod +x /app/AUTOMATION/*.sh && \
