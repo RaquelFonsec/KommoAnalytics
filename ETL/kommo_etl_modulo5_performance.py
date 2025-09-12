@@ -43,7 +43,7 @@ class KommoPerformanceETL:
         }
         
         self.db_config = {
-            'host': 'localhost',
+            'host': os.getenv('DB_HOST', 'localhost'),
             'port': 3306,
             'user': 'kommo_analytics',
             'password': 'previdas_ltda_2025',

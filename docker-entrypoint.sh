@@ -6,7 +6,7 @@ echo "🚀 Iniciando Kommo Analytics..."
 
 # Configurar cron jobs
 echo "⏰ Configurando cron jobs..."
-/app/setup_cron.sh
+/app/AUTOMATION/setup_cron.sh
 
 # Iniciar cron em background
 echo "🔄 Iniciando cron daemon..."

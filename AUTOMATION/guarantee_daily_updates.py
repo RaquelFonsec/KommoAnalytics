@@ -16,7 +16,7 @@ import json
 PROJECT_DIR = "/home/raquel-fonseca/Projects/KommoAnalytics"
 LOG_DIR = f"{PROJECT_DIR}/LOGS"
 DB_CONFIG = {
-    'host': 'localhost',
+    'host': 'os.getenv('DB_HOST', 'localhost')',
     'port': 3306,
     'user': 'kommo_analytics',
     'password': 'previdas_ltda_2025',

@@ -14,32 +14,20 @@ st.set_page_config(page_title="Kommo Analytics", layout="wide")
 # Configuração do banco
 def init_connection():
     try:
-        # Tentar usar st.secrets primeiro, depois variáveis de ambiente
-        try:
-            connection = mysql.connector.connect(
-                host=st.secrets["DB_HOST"],
-                port=int(st.secrets["DB_PORT"]),
-                user=st.secrets["DB_USER"],
-                password=st.secrets["DB_PASSWORD"],
-                database=st.secrets["DB_NAME"],
-                autocommit=True,
-                charset='utf8mb4'
-            )
-        except:
-            # Fallback para variáveis de ambiente
-            import os
-            from dotenv import load_dotenv
-            load_dotenv()
-            
-            connection = mysql.connector.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
-                port=int(os.getenv('DB_PORT', 3306)),
-                user=os.getenv('DB_USER', 'root'),
-                password=os.getenv('DB_PASSWORD', ''),
-                database=os.getenv('DB_NAME', 'kommo_analytics'),
-                autocommit=True,
-                charset='utf8mb4'
-            )
+        # Usar sempre variáveis de ambiente (funciona local e Docker)
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        connection = mysql.connector.connect(
+            host=os.getenv('DB_HOST', '172.17.0.1'),
+            port=int(os.getenv('DB_PORT', 3306)),
+            user=os.getenv('DB_USER', 'kommo_analytics'),
+            password=os.getenv('DB_PASSWORD', 'previdas_ltda_2025'),
+            database=os.getenv('DB_NAME', 'kommo_analytics'),
+            autocommit=True,
+            charset='utf8mb4'
+        )
         return connection
     except Exception as e:
         st.error(f"Erro na conexão com banco: {e}")
@@ -153,7 +141,7 @@ col1, col2 = st.columns(2)
 with col1:
     if not leads_canal_df.empty:
         fig_leads = px.pie(leads_canal_df, values='total_leads', names='canal', title="Leads por Canal")
-        st.plotly_chart(fig_leads, width='stretch')
+        st.plotly_chart(fig_leads, use_container_width=True)
 
 with col2:
     # Custo por canal
@@ -163,7 +151,7 @@ with col2:
         if not canais_com_custo.empty:
             fig_custo = px.bar(canais_com_custo, x='canal', y='custo_medio', title="Custo Médio por Lead por Canal")
             fig_custo.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_custo, width='stretch')
+            st.plotly_chart(fig_custo, use_container_width=True)
         else:
             st.info("Nenhum canal com custo registrado")
 
@@ -180,7 +168,7 @@ with col1:
         if not canais_com_tempo.empty:
             fig_tempo = px.bar(canais_com_tempo, x='canal', y='tempo_resposta_medio', title="Tempo de Resposta por Canal")
             fig_tempo.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_tempo, width='stretch')
+            st.plotly_chart(fig_tempo, use_container_width=True)
         else:
             st.info("Nenhum canal com tempo de resposta registrado")
 
@@ -192,7 +180,7 @@ with col2:
             canais_com_custo['eficiencia'] = canais_com_custo['total_leads'] / canais_com_custo['custo_total']
             fig_eficiencia = px.bar(canais_com_custo, x='canal', y='eficiencia', title="Eficiência: Leads por R$ Investido")
             fig_eficiencia.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_eficiencia, width='stretch')
+            st.plotly_chart(fig_eficiencia, use_container_width=True)
         else:
             st.info("Nenhum canal com custo para análise de eficiência")
 
@@ -216,7 +204,7 @@ if not leads_canal_df.empty:
         'pct_total': '% do Total'
     })
     
-    st.dataframe(canais_display, width='stretch')
+    st.dataframe(canais_display, use_container_width=True)
 else:
     st.info("Nenhum dado de canal encontrado.")
 
@@ -308,7 +296,7 @@ if not vendas_canal_df.empty:
             title="Vendas Ganhas por Canal"
         )
         fig_vendas.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_vendas, width='stretch')
+        st.plotly_chart(fig_vendas, use_container_width=True)
     
     with col2:
         # Taxa de conversão por canal
@@ -324,7 +312,7 @@ if not vendas_canal_df.empty:
             title="Taxa de Conversão por Canal (%)"
         )
         fig_taxa.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_taxa, width='stretch')
+        st.plotly_chart(fig_taxa, use_container_width=True)
 
 # Adicionar análise de UTMs
 st.subheader("🔗 Análise de UTMs")
@@ -357,7 +345,7 @@ if not utms_df.empty:
             names='utm_source',
             title="Leads por UTM Source"
         )
-        st.plotly_chart(fig_utm_source, width='stretch')
+        st.plotly_chart(fig_utm_source, use_container_width=True)
     
     with col2:
         # Top campanhas
@@ -369,7 +357,7 @@ if not utms_df.empty:
             title="Top 5 Campanhas"
         )
         fig_utm_campaign.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_utm_campaign, width='stretch')
+        st.plotly_chart(fig_utm_campaign, use_container_width=True)
     
     # Tabela detalhada de UTMs
     st.subheader("📋 Detalhamento de UTMs")
@@ -382,7 +370,7 @@ if not utms_df.empty:
         'total_leads': 'Total Leads',
         'pct_total': '% do Total'
     })
-    st.dataframe(utms_display, width='stretch')
+    st.dataframe(utms_display, use_container_width=True)
 else:
     st.info("Nenhum dado de UTM encontrado.")
 
@@ -415,7 +403,7 @@ with col1:
             textinfo="value+percent initial"
         ))
         fig_funil.update_layout(title="Funil de Conversão")
-        st.plotly_chart(fig_funil, width='stretch')
+        st.plotly_chart(fig_funil, use_container_width=True)
 
 with col2:
     # Taxa de conversão por etapa
@@ -425,7 +413,7 @@ with col2:
         
         fig_conversao = px.bar(funil_df, x='etapa', y='taxa_conversao', title="Taxa de Conversão por Etapa")
         fig_conversao.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_conversao, width='stretch')
+        st.plotly_chart(fig_conversao, use_container_width=True)
 
 # Métricas do Módulo 2
 col1, col2, col3, col4 = st.columns(4)
@@ -477,7 +465,7 @@ SELECT
             title="Leads por Status - Funil Principal"
         )
         fig_status.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_status, width='stretch')
+        st.plotly_chart(fig_status, use_container_width=True)
 
 with col2:
     # Taxa de conversão por status
@@ -492,7 +480,7 @@ with col2:
             title="Taxa de Conversão por Status (%)"
         )
         fig_taxa.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_taxa, width='stretch')
+        st.plotly_chart(fig_taxa, use_container_width=True)
 
 # Métricas do Funil Principal
 col1, col2, col3, col4 = st.columns(4)
@@ -549,7 +537,7 @@ with col1:
             y='leads_perdidos',
             title="Vendas Perdidas por Tempo no Funil"
         )
-        st.plotly_chart(fig_perdas_tempo, width='stretch')
+        st.plotly_chart(fig_perdas_tempo, use_container_width=True)
 
 with col2:
     # Comparação ganhas vs perdidas
@@ -574,7 +562,7 @@ with col2:
             names='status_name',
             title="Ganhas vs Perdidas"
         )
-        st.plotly_chart(fig_comparacao, width='stretch')
+        st.plotly_chart(fig_comparacao, use_container_width=True)
 
 # Métricas de vendas perdidas
 col1, col2, col3, col4 = st.columns(4)
@@ -648,7 +636,7 @@ with col1:
             title="Vendas Perdidas por Motivo"
         )
         fig_motivos.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_motivos, width='stretch')
+        st.plotly_chart(fig_motivos, use_container_width=True)
 
 with col2:
     # Distribuição com/sem motivo
@@ -665,7 +653,7 @@ with col2:
             names='categoria',
             title="Distribuição: Com vs Sem Motivo"
         )
-        st.plotly_chart(fig_distribuicao, width='stretch')
+        st.plotly_chart(fig_distribuicao, use_container_width=True)
 
 # Tabela detalhada de motivos
 st.subheader("📋 Detalhamento dos Motivos de Perda")
@@ -684,7 +672,7 @@ if not motivos_perda_df.empty:
         'pct_total': '% do Total'
     })
     
-    st.dataframe(motivos_display, width='stretch')
+    st.dataframe(motivos_display, use_container_width=True)
 else:
     st.info("Nenhum motivo de perda encontrado nos dados.")
 
@@ -751,7 +739,7 @@ with col1:
             labels={'activity_type': 'Tipo de Atividade', 'total_atividades': 'Total'}
         )
         fig_atividades.update_layout(xaxis_tickangle=45)
-        st.plotly_chart(fig_atividades, width='stretch')
+        st.plotly_chart(fig_atividades, use_container_width=True)
 
 with col2:
     # Taxa de conclusão por tipo
@@ -764,7 +752,7 @@ with col2:
             labels={'activity_type': 'Tipo de Atividade', 'taxa_conclusao': 'Taxa (%)'}
         )
         fig_conclusao.update_layout(xaxis_tickangle=45)
-        st.plotly_chart(fig_conclusao, width='stretch')
+        st.plotly_chart(fig_conclusao, use_container_width=True)
 
 # Análise por vendedor
 st.subheader("👥 Performance por Vendedor")
@@ -833,7 +821,7 @@ if not vendedores_df.empty:
             labels={'user_name': 'Vendedor', 'total_atividades': 'Total Atividades'}
         )
         fig_vendedores.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_vendedores, width='stretch')
+        st.plotly_chart(fig_vendedores, use_container_width=True)
     
     with col2:
         # Tipos de contato por vendedor (top 5)
@@ -860,7 +848,7 @@ if not vendedores_df.empty:
                 title="Tipos de Contato por Vendedor (Top 5)"
             )
             fig_tipos.update_layout(xaxis_tickangle=45)
-            st.plotly_chart(fig_tipos, width='stretch')
+            st.plotly_chart(fig_tipos, use_container_width=True)
 
 # Tabela detalhada de vendedores
 st.subheader("📋 Detalhamento por Vendedor")
@@ -914,7 +902,7 @@ if not vendedores_df.empty:
     vendedores_final_df = pd.DataFrame(vendedores_final)
     
     # Exibir tabela com todas as métricas
-    st.dataframe(vendedores_final_df, width='stretch')
+    st.dataframe(vendedores_final_df, use_container_width=True)
     
     # Resumo das métricas de follow-up
     st.subheader("🎯 Resumo de Follow-ups e Engajamento")
@@ -950,7 +938,7 @@ if not vendedores_df.empty:
                 labels={'user_name': 'Vendedor', 'score_medio_urgencia': 'Score Urgência (1-10)'}
             )
             fig_urgency.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_urgency, width='stretch')
+            st.plotly_chart(fig_urgency, use_container_width=True)
     
     with col2:
         # Distribuição por categoria de prioridade
@@ -967,7 +955,7 @@ if not vendedores_df.empty:
                 names='Categoria',
                 title="Distribuição por Categoria de Prioridade"
             )
-            st.plotly_chart(fig_priority, width='stretch')
+            st.plotly_chart(fig_priority, use_container_width=True)
 
 # Análise temporal
 st.subheader("📈 Atividades ao Longo do Tempo")
@@ -995,7 +983,7 @@ if not temporal_df.empty:
         color='activity_type',
         title="Atividades por Dia e Tipo"
     )
-    st.plotly_chart(fig_temporal, width='stretch')
+    st.plotly_chart(fig_temporal, use_container_width=True)
 
 # SEÇÃO 5: MÓDULO 4 - CONVERSÃO E RECEITA
 st.header("💰 Módulo 4: Conversão e Receita")
@@ -1082,7 +1070,7 @@ if not vendedores_vendas_df.empty:
             labels={'vendedor': 'Vendedor', 'vendas_fechadas': 'Vendas Fechadas'}
         )
         fig_vendedores_vendas.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_vendedores_vendas, width='stretch')
+        st.plotly_chart(fig_vendedores_vendas, use_container_width=True)
     
     with col2:
         # Receita por vendedor
@@ -1096,7 +1084,7 @@ if not vendedores_vendas_df.empty:
                 labels={'vendedor': 'Vendedor', 'receita_total': 'Receita (R$)'}
             )
             fig_receita.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_receita, width='stretch')
+            st.plotly_chart(fig_receita, use_container_width=True)
 
 # Win Rate por vendedor
 col1, col2 = st.columns(2)
@@ -1116,7 +1104,7 @@ with col1:
             labels={'vendedor': 'Vendedor', 'win_rate': 'Win Rate (%)'}
         )
         fig_win_rate.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_win_rate, width='stretch')
+        st.plotly_chart(fig_win_rate, use_container_width=True)
 
 with col2:
     # Ciclo de vendas por vendedor
@@ -1133,7 +1121,7 @@ with col2:
             labels={'vendedor': 'Vendedor', 'ciclo_medio': 'Ciclo (dias)'}
         )
         fig_ciclo.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_ciclo, width='stretch')
+        st.plotly_chart(fig_ciclo, use_container_width=True)
 
 # Tabela detalhada de performance de vendas
 st.subheader("📋 Ranking Detalhado de Vendedores")
@@ -1153,7 +1141,7 @@ if not vendedores_vendas_df.empty:
         'ciclo_medio': 'Ciclo Médio (dias)'
     })
     
-    st.dataframe(vendedores_vendas_display, width='stretch')
+    st.dataframe(vendedores_vendas_display, use_container_width=True)
 
 # Análise temporal de conversões
 st.subheader("📈 Conversões ao Longo do Tempo")
@@ -1200,7 +1188,7 @@ if not conversoes_temporais_df.empty:
         hovermode='x unified'
     )
     
-    st.plotly_chart(fig_temporal, width='stretch')
+    st.plotly_chart(fig_temporal, use_container_width=True)
 
 # Insights e alertas de conversão
 st.subheader("💡 Insights de Conversão")
@@ -1323,7 +1311,7 @@ if not performance_vendedores_df.empty:
             color_continuous_scale='Viridis'
         )
         fig_vendedores_receita.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_vendedores_receita, width='stretch')
+        st.plotly_chart(fig_vendedores_receita, use_container_width=True)
     
     with col2:
         # Ranking por taxa de conversão
@@ -1339,7 +1327,7 @@ if not performance_vendedores_df.empty:
                 color_continuous_scale='RdYlGn'
             )
             fig_vendedores_conversao.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_vendedores_conversao, width='stretch')
+            st.plotly_chart(fig_vendedores_conversao, use_container_width=True)
         else:
             # Mostrar todos os vendedores se não houver filtro
             fig_vendedores_conversao = px.bar(
@@ -1352,7 +1340,7 @@ if not performance_vendedores_df.empty:
                 color_continuous_scale='RdYlGn'
             )
             fig_vendedores_conversao.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_vendedores_conversao, width='stretch')
+            st.plotly_chart(fig_vendedores_conversao, use_container_width=True)
 
     # Análise avançada de vendedores
     col1, col2 = st.columns(2)
@@ -1378,7 +1366,7 @@ if not performance_vendedores_df.empty:
                 color_continuous_scale='Plasma'
             )
             fig_eficiencia.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_eficiencia, width='stretch')
+            st.plotly_chart(fig_eficiencia, use_container_width=True)
     
     with col2:
         # Scatter plot: Win Rate vs Ticket Médio
@@ -1397,7 +1385,7 @@ if not performance_vendedores_df.empty:
                 title="🎯 Win Rate vs Ticket Médio",
                 labels={'win_rate': 'Win Rate (%)', 'ticket_medio': 'Ticket Médio (R$)'}
             )
-            st.plotly_chart(fig_scatter, width='stretch')
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
 # Performance de Canais
 st.subheader("📈 Análise de Canais")
@@ -1419,7 +1407,7 @@ if not performance_canais_df.empty:
                 color_continuous_scale='RdYlGn'
             )
             fig_canais_conversao.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_canais_conversao, width='stretch')
+            st.plotly_chart(fig_canais_conversao, use_container_width=True)
     
     with col2:
         # ROI por canal
@@ -1435,7 +1423,7 @@ if not performance_canais_df.empty:
                 color_continuous_scale='RdYlBu'
             )
             fig_canais_roi.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_canais_roi, width='stretch')
+            st.plotly_chart(fig_canais_roi, use_container_width=True)
 
     # Análise de qualidade dos canais
     col1, col2 = st.columns(2)
@@ -1453,7 +1441,7 @@ if not performance_canais_df.empty:
                 title="📊 Volume vs Qualidade dos Canais",
                 labels={'total_leads': 'Total Leads', 'conversion_rate': 'Taxa Conversão (%)'}
             )
-            st.plotly_chart(fig_canais_scatter, width='stretch')
+            st.plotly_chart(fig_canais_scatter, use_container_width=True)
     
     with col2:
         # Eficiência de custo
@@ -1469,7 +1457,7 @@ if not performance_canais_df.empty:
                 color_continuous_scale='Reds_r'
             )
             fig_custo_lead.update_xaxes(tickangle=45)
-            st.plotly_chart(fig_custo_lead, width='stretch')
+            st.plotly_chart(fig_custo_lead, use_container_width=True)
 
 # Tabelas detalhadas
 col1, col2 = st.columns(2)
@@ -1485,7 +1473,7 @@ with col1:
             'win_rate': 'Win Rate (%)',
             'ticket_medio': 'Ticket Médio (R$)'
         })
-        st.dataframe(top_vendedores_display, width='stretch')
+        st.dataframe(top_vendedores_display, use_container_width=True)
 
 with col2:
     st.subheader("📈 Top 10 Canais")
@@ -1498,7 +1486,7 @@ with col2:
             'conversion_rate': 'Conv Rate (%)',
             'roi': 'ROI (%)'
         })
-        st.dataframe(top_canais_display, width='stretch')
+        st.dataframe(top_canais_display, use_container_width=True)
 
 # SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST) - CORRIGIDO
 st.header("🔮 Módulo 6: Previsibilidade (Forecast)")

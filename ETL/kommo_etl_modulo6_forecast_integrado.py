@@ -590,24 +590,24 @@ class KommoForecastIntegradoETL:
                 trend_forecast = {}
             
             # 6. Carregar dados
-            logger.info("💾 Carregando dados...")
+            logger.info(" Carregando dados...")
             self.load_forecast_data(mes_ano, forecast, gaps)
             
             logger.info("🎉 === ETL MÓDULO 6 INTEGRADO CONCLUÍDO ===")
             
             # Resumo executivo
-            logger.info("📊 RESUMO EXECUTIVO BASEADO NOS MÓDULOS:")
-            logger.info(f"  📅 Mês: {forecast['mes_ano']}")
-            logger.info(f"  📈 Módulo 1 - Leads: {dados_modulos['modulo1']['total_leads']:,}")
-            logger.info(f"  🎯 Módulo 2 - Funil: {dados_modulos['modulo2']['vendas_ganhas']} vendas ganhas")
-            logger.info(f"  📞 Módulo 3 - Atividades: {dados_modulos['modulo3']['atividades_concluidas']:,} concluídas")
-            logger.info(f"  💰 Módulo 4 - Receita: R$ {dados_modulos['modulo4']['receita_total']:,.2f}")
-            logger.info(f"  👥 Módulo 5 - Vendedores: {dados_modulos['modulo5']['vendedores_unicos']} ativos")
-            logger.info(f"  🎯 Meta de Receita: R$ {forecast['meta_receita']:,.2f}")
-            logger.info(f"  📈 Previsão de Receita: R$ {forecast['previsao_receita']:,.2f}")
-            logger.info(f"  📊 Previsão de Leads: {forecast['previsao_leads']:,}")
-            logger.info(f"  🎯 Win Rate: {forecast['previsao_win_rate']:.1f}%")
-            logger.info(f"  💰 Ticket Médio: R$ {forecast['previsao_ticket_medio']:,.2f}")
+            logger.info(" RESUMO EXECUTIVO BASEADO NOS MÓDULOS:")
+            logger.info(f"   Mês: {forecast['mes_ano']}")
+            logger.info(f"   Módulo 1 - Leads: {dados_modulos['modulo1']['total_leads']:,}")
+            logger.info(f"   Módulo 2 - Funil: {dados_modulos['modulo2']['vendas_ganhas']} vendas ganhas")
+            logger.info(f"   Módulo 3 - Atividades: {dados_modulos['modulo3']['atividades_concluidas']:,} concluídas")
+            logger.info(f"   Módulo 4 - Receita: R$ {dados_modulos['modulo4']['receita_total']:,.2f}")
+            logger.info(f"   Módulo 5 - Vendedores: {dados_modulos['modulo5']['vendedores_unicos']} ativos")
+            logger.info(f"   Meta de Receita: R$ {forecast['meta_receita']:,.2f}")
+            logger.info(f"   Previsão de Receita: R$ {forecast['previsao_receita']:,.2f}")
+            logger.info(f"   Previsão de Leads: {forecast['previsao_leads']:,}")
+            logger.info(f"   Win Rate: {forecast['previsao_win_rate']:.1f}%")
+            logger.info(f"   Ticket Médio: R$ {forecast['previsao_ticket_medio']:,.2f}")
             
             if gaps:
                 logger.info("⚠️ ANÁLISE DE GAPS:")
