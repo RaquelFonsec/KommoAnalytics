@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script para executar todos os ETLs automaticamente
 # Autor: Sistema de Automação Kommo Analytics
-# Data: $(date)
+# Data: 2025-09-12
 
 # Configurações
 PROJECT_DIR="/app"
