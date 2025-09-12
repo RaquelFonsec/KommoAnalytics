@@ -25,19 +25,18 @@ coverage.xml
 .hypothesis
 
 # Virtual environments
-.env
-.venv
-env/
 venv/
+dashboard_env/
 ENV/
-env.bak/
-venv.bak/
+env/
+.venv/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -49,9 +48,23 @@ ehthumbs.db
 Thumbs.db
 
 # Logs
-LOGS/
+LOGS/*.log
 *.log
 
 # Backup files
-*.backup
-*.bak
+BACKUP/
+*.sql
+*.sql.gz
+*.tar.gz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation
+README.md
+*.md
+
+# Docker
+.dockerignore

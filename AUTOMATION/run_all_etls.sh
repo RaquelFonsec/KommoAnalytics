@@ -1,12 +1,11 @@
 #!/bin/bash
 # Script para executar todos os ETLs automaticamente
 # Autor: Sistema de Automação Kommo Analytics
-# Data: $(date)
+# Data: 2025-09-12
 
 # Configurações
-PROJECT_DIR="/home/raquel-fonseca/Projects/KommoAnalytics"
+PROJECT_DIR="/app"
 LOG_DIR="$PROJECT_DIR/LOGS"
-VENV_PATH="$PROJECT_DIR/venv"
 ETL_DIR="$PROJECT_DIR/ETL"
 
 # Criar diretório de logs se não existir
@@ -25,7 +24,6 @@ run_etl() {
     log_with_timestamp " Iniciando $etl_name..."
     
     cd "$ETL_DIR"
-    source "$VENV_PATH/bin/activate"
     
     if python3 "$etl_file" >> "$LOG_DIR/${etl_name,,}_$(date +%Y%m%d).log" 2>&1; then
         log_with_timestamp " $etl_name concluído com sucesso"

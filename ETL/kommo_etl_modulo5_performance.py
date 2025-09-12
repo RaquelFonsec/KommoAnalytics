@@ -43,7 +43,7 @@ class KommoPerformanceETL:
         }
         
         self.db_config = {
-            'host': 'localhost',
+            'host': os.getenv('DB_HOST', 'localhost'),
             'port': 3306,
             'user': 'kommo_analytics',
             'password': 'previdas_ltda_2025',
@@ -388,7 +388,7 @@ class KommoPerformanceETL:
             created_date = datetime.now().date()
             
             # Limpar dados existentes dos últimos 30 dias
-            start_date = (datetime.now() - timedelta(days=30)).date()
+            start_date = (datetime.now() - timedelta(days=90)).date()
             cursor.execute("DELETE FROM performance_vendedores WHERE created_date >= %s", (start_date,))
             cursor.execute("DELETE FROM performance_canais WHERE created_date >= %s", (start_date,))
             

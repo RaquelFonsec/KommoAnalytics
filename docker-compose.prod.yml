@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Streamlit Application
+  streamlit:
+    image: kommo-analytics:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: kommo_streamlit_prod
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./LOGS:/app/LOGS
+      - ./BACKUP:/app/BACKUP
+      - ./DASHBOARD/.streamlit:/app/DASHBOARD/.streamlit
+    ports:
+      - "8501:8501"  
+    networks:
+      - kommo_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: kommo_nginx_prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+  
+    networks:
+      - kommo_network
+
+networks:
+  kommo_network:
+    driver: bridge
