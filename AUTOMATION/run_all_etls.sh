@@ -4,7 +4,7 @@
 # Data: 2025-09-12
 
 # Configurações
-PROJECT_DIR="/app"
+PROJECT_DIR="/home/raquel-fonseca/KommoAnalytics"
 LOG_DIR="$PROJECT_DIR/LOGS"
 ETL_DIR="$PROJECT_DIR/ETL"
 
@@ -65,22 +65,22 @@ fi
 
 sleep 30
 
-# Módulo 4: Conversão e Receita
-if run_etl "Módulo 4 - Conversão" "kommo_etl_modulo4_conversao.py"; then
+# Módulo 4: Conversão e Receita (API)
+if run_etl "Módulo 4 - Conversão API" "kommo_etl_modulo4_conversao_api.py"; then
     ((success_count++))
 fi
 
 sleep 30
 
-# Módulo 5: Performance por Pessoa e Canal
-if run_etl "Módulo 5 - Performance" "kommo_etl_modulo5_performance.py"; then
+# Módulo 5: Performance por Pessoa e Canal (API)
+if run_etl "Módulo 5 - Performance API" "kommo_etl_modulo5_performance_api.py"; then
     ((success_count++))
 fi
 
 sleep 30
 
-# Módulo 6: Previsibilidade (Forecast)
-if run_etl "Módulo 6 - Forecast" "kommo_etl_modulo6_forecast_integrado.py"; then
+# Módulo 6: Previsibilidade (Forecast) (API)
+if run_etl "Módulo 6 - Forecast API" "kommo_etl_modulo6_forecast_api.py"; then
     ((success_count++))
 fi
 
