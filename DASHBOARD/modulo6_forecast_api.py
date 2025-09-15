@@ -56,8 +56,8 @@ def render_modulo6_forecast(selected_date):
             dia_semana,
             created_date
         FROM revenue_forecast 
-        WHERE created_date = CURDATE()
-        ORDER BY tipo
+        WHERE created_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        ORDER BY created_date DESC, tipo
         """
         forecast_df = run_query(forecast_query)
         
