@@ -27,7 +27,7 @@ def init_connection():
             )
         except:
             # Fallback para variáveis de ambiente
-aao            import os
+            import os
             from dotenv import load_dotenv
             load_dotenv()
             
@@ -63,29 +63,37 @@ st.title(" Kommo Analytics Dashboard -")
 
 # Sidebar
 st.sidebar.title(" Filtros")
-# Criar lista de meses do ano atual
+# Criar lista de meses do ano atual e próximo
+current_year = datetime.now().year
+next_year = current_year + 1
+
 meses_ano = [
-    "Janeiro 2025", "Fevereiro 2025", "Março 2025", "Abril 2025", 
-    "Maio 2025", "Junho 2025", "Julho 2025", "Agosto 2025", 
-    "Setembro 2025", "Outubro 2025", "Novembro 2025", "Dezembro 2025",
+    f"Janeiro {current_year}", f"Fevereiro {current_year}", f"Março {current_year}", f"Abril {current_year}", 
+    f"Maio {current_year}", f"Junho {current_year}", f"Julho {current_year}", f"Agosto {current_year}", 
+    f"Setembro {current_year}", f"Outubro {current_year}", f"Novembro {current_year}", f"Dezembro {current_year}",
+    f"Janeiro {next_year}", f"Fevereiro {next_year}", f"Março {next_year}", f"Abril {next_year}",
+    f"Maio {next_year}", f"Junho {next_year}", f"Julho {next_year}", f"Agosto {next_year}",
+    f"Setembro {next_year}", f"Outubro {next_year}", f"Novembro {next_year}", f"Dezembro {next_year}",
     "Todos os dados"
 ]
 
-periodo = st.sidebar.selectbox("Período:", meses_ano, index=8)  # Setembro por padrão
+periodo = st.sidebar.selectbox("Período:", meses_ano, index=8)  # Setembro do ano atual por padrão
 
 # Definir data de início baseada no período selecionado
 if periodo == "Todos os dados":
-    data_inicio = datetime(2025, 1, 1)  # Data muito antiga para pegar todos os dados
+    data_inicio = datetime(2025, 1, 1)
 else:
     # Extrair mês e ano do período selecionado
-    mes_nome, ano = periodo.split()
+    mes_nome, ano_nome = periodo.split()
+    ano_num = int(ano_nome)
+    
     meses_dict = {
         "Janeiro": 1, "Fevereiro": 2, "Março": 3, "Abril": 4,
         "Maio": 5, "Junho": 6, "Julho": 7, "Agosto": 8,
         "Setembro": 9, "Outubro": 10, "Novembro": 11, "Dezembro": 12
     }
+    
     mes_num = meses_dict[mes_nome]
-    ano_num = int(ano)
     
     # Data de início do mês
     data_inicio = datetime(ano_num, mes_num, 1)
@@ -98,8 +106,47 @@ else:
 # Data para queries
 selected_date = datetime.now().strftime('%Y-%m-%d')
 
+# Função para verificar se o mês selecionado tem dados
+def verificar_dados_mes(data_inicio, data_fim):
+    """Verifica se existem dados para o período selecionado"""
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se há dados de leads no período
+        cursor.execute(f"""
+            SELECT COUNT(*) as total
+            FROM leads_metrics 
+            WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
+        """)
+        
+        result = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        
+        return result[0] > 0 if result else False
+        
+    except Exception as e:
+        return False
+
+# Verificar se o mês selecionado tem dados
+tem_dados = verificar_dados_mes(data_inicio, data_fim)
+
+# Função para executar query com verificação de dados
+def run_query_with_check(query, default_message="Nenhum dado encontrado"):
+    """Executa query e retorna dados ou mensagem padrão"""
+    if tem_dados:
+        return run_query(query)
+    else:
+        return pd.DataFrame()  # Retorna DataFrame vazio
+
 # SEÇÃO 1: RESUMO EXECUTIVO
 st.header(" Resumo Executivo")
+
+# Verificar se há dados para o período selecionado
+if not tem_dados:
+    st.warning(f"⚠️ **Nenhum dado encontrado para {periodo}**. Os dados serão exibidos quando estiverem disponíveis.")
+    st.info("💡 **Dica**: Selecione um mês anterior (Janeiro a Setembro 2025) para ver dados históricos.")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -118,7 +165,7 @@ WHERE l.created_date >= '{data_inicio.date()}' AND l.created_date <= '{data_fim.
 
 kpis_df = run_query(kpis_query)
 
-if not kpis_df.empty:
+if not kpis_df.empty and tem_dados:
     kpi = kpis_df.iloc[0]
     
     with col1:
@@ -131,6 +178,16 @@ if not kpis_df.empty:
         st.metric(" Vendas Perdidas", f"{kpi['vendas_perdidas']:,}", f"{loss_rate:.1f}% loss rate")
     with col4:
         st.metric("💰 Custo Total", f"R$ {kpi['custo_total']:,.0f}")
+else:
+    # Mostrar dados zerados quando não há dados
+    with col1:
+        st.metric("📈 Total Leads", "0")
+    with col2:
+        st.metric("🎯 Vendas Ganhas", "0", "0% win rate")
+    with col3:
+        st.metric("❌ Vendas Perdidas", "0", "0% loss rate")
+    with col4:
+        st.metric("💰 Custo Total", "R$ 0,00")
 
 # SEÇÃO 2: MÓDULO 1 - ENTRADA E ORIGEM DE LEADS
 st.header("🎯 Módulo 1: Entrada e Origem de Leads")
@@ -145,7 +202,7 @@ SELECT
     SUM(lead_cost) as custo_total,
     AVG(lead_cost) as custo_medio
 FROM leads_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY primary_source
 ORDER BY total_leads DESC
 """
@@ -255,7 +312,7 @@ SELECT
     SUM(lead_cost) as custo_total,
     AVG(lead_cost) as custo_medio
 FROM leads_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY primary_source
 ORDER BY total_leads DESC
 """
@@ -359,7 +416,7 @@ SELECT
     utm_campaign,
     COUNT(*) as total_leads
 FROM leads_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 AND utm_source IS NOT NULL
 GROUP BY utm_source, utm_medium, utm_campaign
 ORDER BY total_leads DESC
@@ -741,7 +798,7 @@ SELECT
     ROUND(COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
     COUNT(DISTINCT entity_id) as leads_contatatados
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY activity_type 
 ORDER BY total_atividades DESC
 """
@@ -813,7 +870,7 @@ SELECT
     ROUND(COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
     COUNT(DISTINCT entity_id) as leads_diferentes
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY user_name, user_role 
 ORDER BY total_atividades DESC
 LIMIT 10
@@ -831,7 +888,7 @@ SELECT
     COUNT(CASE WHEN follow_up_category = 'baixa_prioridade' THEN 1 END) as baixa_prioridade,
     AVG(urgency_score) as score_medio_urgencia
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}' AND is_follow_up = 1
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}' AND is_follow_up = 1
 GROUP BY user_name
 """
 
@@ -845,7 +902,7 @@ SELECT
     COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till >= created_date THEN 1 END) as followups_no_prazo,
     COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till < created_date THEN 1 END) as followups_atrasados
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY user_name
 """
 
@@ -1009,7 +1066,7 @@ SELECT
     activity_type,
     COUNT(*) as atividades
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY DATE(created_datetime), activity_type
 ORDER BY data DESC
 LIMIT 50
@@ -1042,7 +1099,7 @@ SELECT
     AVG(sale_price) as ticket_medio,
     AVG(sales_cycle_days) as ciclo_medio_dias
 FROM sales_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY status_name, status_type
 ORDER BY total_leads DESC
 """
@@ -1092,7 +1149,7 @@ SELECT
                  COUNT(CASE WHEN status_name = 'Venda perdida' THEN 1 END), 0) * 100, 1) as win_rate,
     ROUND(AVG(CASE WHEN status_name = 'Venda ganha' THEN sales_cycle_days END), 1) as ciclo_medio
 FROM sales_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY responsible_user_name, responsible_user_role
 ORDER BY vendas_fechadas DESC
 LIMIT 10
@@ -1240,7 +1297,7 @@ st.header("🏆 Módulo 5: Performance por Pessoa e Canal")
 st.markdown("**Para gestão e tomada de decisão: rankings de vendedores e análise de canais mais qualificados**")
 
 # Buscar dados de performance de vendedores (usando dados da API do Kommo)
-performance_vendedores_query = """
+performance_vendedores_query = f"""
 SELECT 
     user_name,
     user_role,
@@ -1258,13 +1315,14 @@ SELECT
     leads_contactados,
     taxa_conclusao_atividades
 FROM performance_vendedores 
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 ORDER BY receita_total DESC
 """
 
 performance_vendedores_df = run_query(performance_vendedores_query)
 
 # Buscar dados de performance por canal (usando dados da API do Kommo)
-performance_canais_query = """
+performance_canais_query = f"""
 SELECT 
     canal_origem,
     utm_source,
@@ -1282,6 +1340,7 @@ SELECT
     tempo_resposta_medio,
     ciclo_vendas_medio
 FROM performance_canais 
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 ORDER BY receita_total DESC
 """
 
@@ -1290,7 +1349,7 @@ performance_canais_df = run_query(performance_canais_query)
 # Métricas principais do Módulo 5
 col1, col2, col3, col4 = st.columns(4)
 
-if not performance_vendedores_df.empty and not performance_canais_df.empty:
+if not performance_vendedores_df.empty and not performance_canais_df.empty and tem_dados:
     top_vendedor = performance_vendedores_df.iloc[0]
     top_canal = performance_canais_df.iloc[0]
     total_vendedores = performance_vendedores_df['user_name'].nunique()
@@ -1307,11 +1366,21 @@ if not performance_vendedores_df.empty and not performance_canais_df.empty:
     
     with col4:
         st.metric("📈 Canais", f"{total_canais}")
+else:
+    # Mostrar dados zerados quando não há dados
+    with col1:
+        st.metric("👑 Top Vendedor", "Sem dados", "R$ 0")
+    with col2:
+        st.metric("🏆 Top Canal", "Sem dados", "R$ 0")
+    with col3:
+        st.metric("👥 Vendedores", "0")
+    with col4:
+        st.metric("📈 Canais", "0")
 
 # Performance de Vendedores
 st.subheader("👥 Ranking de Vendedores")
 
-if not performance_vendedores_df.empty:
+if not performance_vendedores_df.empty and tem_dados:
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1401,11 +1470,13 @@ if not performance_vendedores_df.empty:
                 labels={'win_rate': 'Win Rate (%)', 'ticket_medio': 'Ticket Médio (R$)'}
             )
             st.plotly_chart(fig_scatter, width='stretch')
+else:
+    st.info("📊 **Nenhum dado de performance de vendedores encontrado para o período selecionado.**")
 
 # Performance de Canais
 st.subheader("📈 Análise de Canais")
 
-if not performance_canais_df.empty:
+if not performance_canais_df.empty and tem_dados:
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1502,6 +1573,9 @@ with col2:
             'roi': 'ROI (%)'
         })
         st.dataframe(top_canais_display, width='stretch')
-        # SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST) - API KOMMO
-from modulo6_forecast_api import render_modulo6_forecast
-render_modulo6_forecast(selected_date)
+    else:
+        st.info("📊 **Nenhum dado de performance de canais encontrado para o período selecionado.**")
+
+# SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST) - API KOMMO
+from modulo6_forecast_mensal import render_modulo6_forecast_mensal
+render_modulo6_forecast_mensal()

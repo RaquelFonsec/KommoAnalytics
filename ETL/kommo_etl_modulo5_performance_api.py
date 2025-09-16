@@ -134,15 +134,25 @@ class PerformanceETLAPI:
         return sources_mapping
     
     def get_leads_from_api(self, days=30):
-        """Busca leads da API do Kommo dos últimos N dias"""
-        logger.info(f"🔍 Buscando leads dos últimos {days} dias da API do Kommo...")
+        """Busca leads da API do Kommo do mês atual (Setembro)"""
+        logger.info(f"🔍 Buscando leads do mês atual (Setembro) da API do Kommo...")
         
-        # Calcular data de início
-        data_inicio = datetime.now() - timedelta(days=days)
+        # Calcular data de início (mês atual - Setembro)
+        hoje = datetime.now()
+        
+        # Primeiro dia do mês atual
+        data_inicio = datetime(hoje.year, hoje.month, 1)
+        # Data atual (hoje)
+        data_fim = hoje
+        
         timestamp_inicio = int(data_inicio.timestamp())
+        timestamp_fim = int(data_fim.timestamp())
+        
+        logger.info(f"📅 Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')} ({hoje.day} dias)")
         
         params = {
             'filter[created_at][from]': timestamp_inicio,
+            'filter[created_at][to]': timestamp_fim,
             'limit': 250  # Máximo por página
         }
         
@@ -420,14 +430,14 @@ class PerformanceETLAPI:
         connection = mysql.connector.connect(**self.db_config)
         cursor = connection.cursor()
         
-        hoje = datetime.now().date()
+        # Usar data do mês atual (Setembro)
+        hoje = datetime.now()
+        data_setembro = datetime(hoje.year, hoje.month, 1).date()
         agora = datetime.now()
         
         # Limpar dados antigos
-        cursor.execute("DELETE FROM performance_vendedores WHERE created_date != %s", (hoje,))
-        cursor.execute("DELETE FROM performance_canais WHERE created_date != %s", (hoje,))
-        cursor.execute("DELETE FROM performance_vendedores WHERE created_date = %s", (hoje,))
-        cursor.execute("DELETE FROM performance_canais WHERE created_date = %s", (hoje,))
+        cursor.execute("DELETE FROM performance_vendedores WHERE created_date = %s", (data_setembro,))
+        cursor.execute("DELETE FROM performance_canais WHERE created_date = %s", (data_setembro,))
         
         # Inserir vendedores
         vendedores_inseridos = 0
@@ -456,7 +466,7 @@ class PerformanceETLAPI:
                 0,  # atividades_concluidas
                 vendedor['total_leads'],  # leads_contactados
                 0,  # taxa_conclusao_atividades
-                hoje,
+                data_setembro,
                 agora
             ))
             vendedores_inseridos += 1
@@ -486,7 +496,7 @@ class PerformanceETLAPI:
                 0,  # roi
                 0,  # tempo_resposta_medio
                 0,  # ciclo_vendas_medio
-                hoje,
+                data_setembro,
                 agora
             ))
             canais_inseridos += 1
@@ -505,8 +515,8 @@ def main():
         
         etl = PerformanceETLAPI()
         
-        # Extrair dados da API
-        dados = etl.extract_performance_data(days=30)
+        # Extrair dados da API (mês atual - Setembro)
+        dados = etl.extract_performance_data(days=30)  # Busca dados do mês atual
         
         # Carregar no banco
         etl.load_to_database(dados)

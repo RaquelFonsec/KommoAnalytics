@@ -80,7 +80,7 @@ fi
 sleep 30
 
 # Módulo 6: Previsibilidade (Forecast) (API)
-if run_etl "Módulo 6 - Forecast API" "kommo_etl_modulo6_forecast_api.py"; then
+if run_etl "Módulo 6 - Forecast Mensal" "kommo_etl_modulo6_forecast_mensal.py"; then
     ((success_count++))
 fi
 
