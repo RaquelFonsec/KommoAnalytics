@@ -5,7 +5,6 @@ import mysql.connector
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -28,7 +27,7 @@ def init_connection():
             )
         except:
             # Fallback para variáveis de ambiente
-            import os
+aao            import os
             from dotenv import load_dotenv
             load_dotenv()
             
@@ -71,8 +70,9 @@ if periodo == "Todos os dados":
     data_inicio = datetime(2025, 1, 1)  # Data muito antiga para pegar todos os dados
 else:
     meses = int(periodo.split()[0])
-    # Calcular data de início baseada em meses
-    data_inicio = datetime.now() - relativedelta(months=meses)
+    # Calcular data de início baseada em meses (aproximado: 30 dias por mês)
+    dias_aproximados = meses * 30
+    data_inicio = datetime.now() - timedelta(days=dias_aproximados)
 
 # Data para queries
 selected_date = datetime.now().strftime('%Y-%m-%d')
