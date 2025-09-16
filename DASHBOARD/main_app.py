@@ -63,16 +63,37 @@ st.title(" Kommo Analytics Dashboard -")
 
 # Sidebar
 st.sidebar.title(" Filtros")
-periodo = st.sidebar.selectbox("Período:", ["1 mês", "2 meses", "3 meses", "6 meses", "12 meses", "Todos os dados"], index=2)  # 3 meses por padrão
+# Criar lista de meses do ano atual
+meses_ano = [
+    "Janeiro 2025", "Fevereiro 2025", "Março 2025", "Abril 2025", 
+    "Maio 2025", "Junho 2025", "Julho 2025", "Agosto 2025", 
+    "Setembro 2025", "Outubro 2025", "Novembro 2025", "Dezembro 2025",
+    "Todos os dados"
+]
+
+periodo = st.sidebar.selectbox("Período:", meses_ano, index=8)  # Setembro por padrão
 
 # Definir data de início baseada no período selecionado
 if periodo == "Todos os dados":
     data_inicio = datetime(2025, 1, 1)  # Data muito antiga para pegar todos os dados
 else:
-    meses = int(periodo.split()[0])
-    # Calcular data de início baseada em meses (aproximado: 30 dias por mês)
-    dias_aproximados = meses * 30
-    data_inicio = datetime.now() - timedelta(days=dias_aproximados)
+    # Extrair mês e ano do período selecionado
+    mes_nome, ano = periodo.split()
+    meses_dict = {
+        "Janeiro": 1, "Fevereiro": 2, "Março": 3, "Abril": 4,
+        "Maio": 5, "Junho": 6, "Julho": 7, "Agosto": 8,
+        "Setembro": 9, "Outubro": 10, "Novembro": 11, "Dezembro": 12
+    }
+    mes_num = meses_dict[mes_nome]
+    ano_num = int(ano)
+    
+    # Data de início do mês
+    data_inicio = datetime(ano_num, mes_num, 1)
+    # Data de fim do mês
+    if mes_num == 12:
+        data_fim = datetime(ano_num + 1, 1, 1) - timedelta(days=1)
+    else:
+        data_fim = datetime(ano_num, mes_num + 1, 1) - timedelta(days=1)
 
 # Data para queries
 selected_date = datetime.now().strftime('%Y-%m-%d')
@@ -92,7 +113,7 @@ SELECT
     COALESCE(SUM(l.lead_cost), 0) as custo_total
 FROM leads_metrics l
 LEFT JOIN funnel_history fh ON l.lead_id = fh.lead_id AND fh.pipeline_id = 11146887
-WHERE l.created_date >= '{data_inicio.date()}'
+WHERE l.created_date >= '{data_inicio.date()}' AND l.created_date <= '{data_fim.date()}'
 """
 
 kpis_df = run_query(kpis_query)
