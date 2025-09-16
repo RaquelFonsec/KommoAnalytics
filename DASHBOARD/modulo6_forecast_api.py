@@ -215,16 +215,16 @@ def render_modulo6_forecast(selected_date):
         st.subheader("🎯 Análise de Gaps")
         
         # Calcular gaps
-        gap_receita = receita_prevista_mensal - receita_real
+        gap_receita = receita_real - receita_prevista_mensal
         gap_percentual = (gap_receita / receita_prevista_mensal * 100) if receita_prevista_mensal > 0 else 0
         
         st.markdown("**📊 Status Atual:**")
         if gap_receita > 0:
+            st.success(f"✅ **Superando Meta:** R$ {gap_receita:,.2f} ({gap_percentual:.1f}%)")
+            st.success("🎉 **Status:** Meta será atingida")
+        else:
             st.error(f"❌ **Gap de Receita:** R$ {gap_receita:,.2f} ({gap_percentual:.1f}%)")
             st.warning("⚠️ **Risco:** Meta pode não ser atingida")
-        else:
-            st.success(f"✅ **Superando Meta:** R$ {abs(gap_receita):,.2f} ({abs(gap_percentual):.1f}%)")
-            st.success("🎉 **Status:** Meta será atingida")
     
     # Botão de atualização removido - ETL será executado via cron jobs
     
