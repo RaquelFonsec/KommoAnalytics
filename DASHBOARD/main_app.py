@@ -5,6 +5,7 @@ import mysql.connector
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -63,14 +64,15 @@ st.title(" Kommo Analytics Dashboard -")
 
 # Sidebar
 st.sidebar.title(" Filtros")
-periodo = st.sidebar.selectbox("Período:", ["7 dias", "15 dias", "30 dias", "60 dias", "90 dias", "Todos os dados"], index=2)  # 30 dias por padrão
+periodo = st.sidebar.selectbox("Período:", ["1 mês", "2 meses", "3 meses", "6 meses", "12 meses", "Todos os dados"], index=2)  # 3 meses por padrão
 
 # Definir data de início baseada no período selecionado
 if periodo == "Todos os dados":
     data_inicio = datetime(2025, 1, 1)  # Data muito antiga para pegar todos os dados
 else:
-    dias = int(periodo.split()[0])
-    data_inicio = datetime.now() - timedelta(days=dias)
+    meses = int(periodo.split()[0])
+    # Calcular data de início baseada em meses
+    data_inicio = datetime.now() - relativedelta(months=meses)
 
 # Data para queries
 selected_date = datetime.now().strftime('%Y-%m-%d')
