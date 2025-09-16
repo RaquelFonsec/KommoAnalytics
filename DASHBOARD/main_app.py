@@ -1217,7 +1217,7 @@ st.header("🏆 Módulo 5: Performance por Pessoa e Canal")
 st.markdown("**Para gestão e tomada de decisão: rankings de vendedores e análise de canais mais qualificados**")
 
 # Buscar dados de performance de vendedores (usando dados da API do Kommo)
-performance_vendedores_query = f"""
+performance_vendedores_query = """
 SELECT 
     user_name,
     user_role,
@@ -1235,14 +1235,13 @@ SELECT
     leads_contactados,
     taxa_conclusao_atividades
 FROM performance_vendedores 
-WHERE created_date >= '{data_inicio.date()}'
 ORDER BY receita_total DESC
 """
 
 performance_vendedores_df = run_query(performance_vendedores_query)
 
 # Buscar dados de performance por canal (usando dados da API do Kommo)
-performance_canais_query = f"""
+performance_canais_query = """
 SELECT 
     canal_origem,
     utm_source,
@@ -1260,7 +1259,6 @@ SELECT
     tempo_resposta_medio,
     ciclo_vendas_medio
 FROM performance_canais 
-WHERE created_date >= '{data_inicio.date()}'
 ORDER BY receita_total DESC
 """
 
