@@ -125,7 +125,7 @@ def render_modulo6_forecast(selected_date):
         
         with col2:
             # Calcular gap
-            gap_receita = receita_prevista_mensal - receita_real
+            gap_receita = receita_real - receita_prevista_mensal
             gap_percentual = (gap_receita / receita_prevista_mensal * 100) if receita_prevista_mensal > 0 else 0
             
             st.metric(
