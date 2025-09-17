@@ -73,3 +73,5 @@ echo "   • Teste de qualidade: python AUTOMATION/test_data_freshness.py"
 echo "   • Execução manual: ./AUTOMATION/run_all_etls.sh"
 echo "   • Ver cron: crontab -l"
 echo "   • Ver logs: ls -la LOGS/"
+
+

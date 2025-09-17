@@ -1,12 +1,11 @@
 #!/bin/bash
 # Script para executar todos os ETLs automaticamente
 # Autor: Sistema de Automação Kommo Analytics
-# Data: $(date)
+# Data: 2025-09-12
 
 # Configurações
-PROJECT_DIR="/home/raquel-fonseca/Projects/KommoAnalytics"
+PROJECT_DIR="/home/raquel-fonseca/KommoAnalytics"
 LOG_DIR="$PROJECT_DIR/LOGS"
-VENV_PATH="$PROJECT_DIR/venv"
 ETL_DIR="$PROJECT_DIR/ETL"
 
 # Criar diretório de logs se não existir
@@ -25,7 +24,6 @@ run_etl() {
     log_with_timestamp " Iniciando $etl_name..."
     
     cd "$ETL_DIR"
-    source "$VENV_PATH/bin/activate"
     
     if python3 "$etl_file" >> "$LOG_DIR/${etl_name,,}_$(date +%Y%m%d).log" 2>&1; then
         log_with_timestamp " $etl_name concluído com sucesso"
@@ -67,22 +65,22 @@ fi
 
 sleep 30
 
-# Módulo 4: Conversão e Receita
-if run_etl "Módulo 4 - Conversão" "kommo_etl_modulo4_conversao.py"; then
+# Módulo 4: Conversão e Receita (API)
+if run_etl "Módulo 4 - Conversão API" "kommo_etl_modulo4_conversao_api.py"; then
     ((success_count++))
 fi
 
 sleep 30
 
-# Módulo 5: Performance por Pessoa e Canal
-if run_etl "Módulo 5 - Performance" "kommo_etl_modulo5_performance.py"; then
+# Módulo 5: Performance por Pessoa e Canal (API)
+if run_etl "Módulo 5 - Performance API" "kommo_etl_modulo5_performance_api.py"; then
     ((success_count++))
 fi
 
 sleep 30
 
-# Módulo 6: Previsibilidade (Forecast)
-if run_etl "Módulo 6 - Forecast" "kommo_etl_modulo6_forecast_integrado.py"; then
+# Módulo 6: Previsibilidade (Forecast) (API)
+if run_etl "Módulo 6 - Forecast Mensal" "kommo_etl_modulo6_forecast_mensal.py"; then
     ((success_count++))
 fi
 

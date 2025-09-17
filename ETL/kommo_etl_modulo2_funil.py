@@ -916,7 +916,7 @@ class KommoFunnelETL:
             
             # Definir período padrão (últimos 30 dias)
             if not start_date:
-                start_date = datetime.now() - timedelta(days=30)
+                start_date = datetime.now() - timedelta(days=90)
             if not end_date:
                 end_date = datetime.now()
             

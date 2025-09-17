@@ -32,7 +32,7 @@ def init_connection():
             load_dotenv()
             
             connection = mysql.connector.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
+                host=os.getenv('DB_HOST', '172.17.0.1'),
                 port=int(os.getenv('DB_PORT', 3306)),
                 user=os.getenv('DB_USER', 'root'),
                 password=os.getenv('DB_PASSWORD', ''),
@@ -63,15 +63,90 @@ st.title(" Kommo Analytics Dashboard -")
 
 # Sidebar
 st.sidebar.title(" Filtros")
-periodo = st.sidebar.selectbox("Período:", ["7 dias", "15 dias", "30 dias"], index=2)  # 30 dias por padrão
-dias = int(periodo.split()[0])
-data_inicio = datetime.now() - timedelta(days=dias)
+# Criar lista de meses do ano atual e próximo
+current_year = datetime.now().year
+next_year = current_year + 1
+
+meses_ano = [
+    f"Janeiro {current_year}", f"Fevereiro {current_year}", f"Março {current_year}", f"Abril {current_year}", 
+    f"Maio {current_year}", f"Junho {current_year}", f"Julho {current_year}", f"Agosto {current_year}", 
+    f"Setembro {current_year}", f"Outubro {current_year}", f"Novembro {current_year}", f"Dezembro {current_year}",
+    f"Janeiro {next_year}", f"Fevereiro {next_year}", f"Março {next_year}", f"Abril {next_year}",
+    f"Maio {next_year}", f"Junho {next_year}", f"Julho {next_year}", f"Agosto {next_year}",
+    f"Setembro {next_year}", f"Outubro {next_year}", f"Novembro {next_year}", f"Dezembro {next_year}",
+    "Todos os dados"
+]
+
+periodo = st.sidebar.selectbox("Período:", meses_ano, index=8)  # Setembro do ano atual por padrão
+
+# Definir data de início baseada no período selecionado
+if periodo == "Todos os dados":
+    data_inicio = datetime(2025, 1, 1)
+else:
+    # Extrair mês e ano do período selecionado
+    mes_nome, ano_nome = periodo.split()
+    ano_num = int(ano_nome)
+    
+    meses_dict = {
+        "Janeiro": 1, "Fevereiro": 2, "Março": 3, "Abril": 4,
+        "Maio": 5, "Junho": 6, "Julho": 7, "Agosto": 8,
+        "Setembro": 9, "Outubro": 10, "Novembro": 11, "Dezembro": 12
+    }
+    
+    mes_num = meses_dict[mes_nome]
+    
+    # Data de início do mês
+    data_inicio = datetime(ano_num, mes_num, 1)
+    # Data de fim do mês
+    if mes_num == 12:
+        data_fim = datetime(ano_num + 1, 1, 1) - timedelta(days=1)
+    else:
+        data_fim = datetime(ano_num, mes_num + 1, 1) - timedelta(days=1)
 
 # Data para queries
 selected_date = datetime.now().strftime('%Y-%m-%d')
 
+# Função para verificar se o mês selecionado tem dados
+def verificar_dados_mes(data_inicio, data_fim):
+    """Verifica se existem dados para o período selecionado"""
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se há dados de leads no período
+        cursor.execute(f"""
+            SELECT COUNT(*) as total
+            FROM leads_metrics 
+            WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
+        """)
+        
+        result = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        
+        return result[0] > 0 if result else False
+        
+    except Exception as e:
+        return False
+
+# Verificar se o mês selecionado tem dados
+tem_dados = verificar_dados_mes(data_inicio, data_fim)
+
+# Função para executar query com verificação de dados
+def run_query_with_check(query, default_message="Nenhum dado encontrado"):
+    """Executa query e retorna dados ou mensagem padrão"""
+    if tem_dados:
+        return run_query(query)
+    else:
+        return pd.DataFrame()  # Retorna DataFrame vazio
+
 # SEÇÃO 1: RESUMO EXECUTIVO
 st.header(" Resumo Executivo")
+
+# Verificar se há dados para o período selecionado
+if not tem_dados:
+    st.warning(f"⚠️ **Nenhum dado encontrado para {periodo}**. Os dados serão exibidos quando estiverem disponíveis.")
+    st.info("💡 **Dica**: Selecione um mês anterior (Janeiro a Setembro 2025) para ver dados históricos.")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -79,18 +154,18 @@ col1, col2, col3, col4 = st.columns(4)
 kpis_query = f"""
 SELECT 
     COUNT(DISTINCT l.lead_id) as total_leads,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda ganha' THEN fh.lead_id END) as vendas,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda perdida' THEN fh.lead_id END) as vendas_perdidas,
-    COALESCE(AVG(l.response_time_hours), 0) as tempo_resposta_medio,
+    COUNT(DISTINCT CASE WHEN fh.status_name = 'Closed - won' THEN fh.lead_id END) as vendas,
+    COUNT(DISTINCT CASE WHEN fh.status_name = 'Closed - lost' THEN fh.lead_id END) as vendas_perdidas,
+    COALESCE(AVG(CASE WHEN l.response_time_hours > 0 AND l.response_time_hours <= 48 THEN l.response_time_hours END), 0) as tempo_resposta_medio,
     COALESCE(SUM(l.lead_cost), 0) as custo_total
 FROM leads_metrics l
 LEFT JOIN funnel_history fh ON l.lead_id = fh.lead_id AND fh.pipeline_id = 11146887
-WHERE l.created_date >= '{data_inicio.date()}'
+WHERE l.created_date >= '{data_inicio.date()}' AND l.created_date <= '{data_fim.date()}'
 """
 
 kpis_df = run_query(kpis_query)
 
-if not kpis_df.empty:
+if not kpis_df.empty and tem_dados:
     kpi = kpis_df.iloc[0]
     
     with col1:
@@ -103,6 +178,16 @@ if not kpis_df.empty:
         st.metric(" Vendas Perdidas", f"{kpi['vendas_perdidas']:,}", f"{loss_rate:.1f}% loss rate")
     with col4:
         st.metric("💰 Custo Total", f"R$ {kpi['custo_total']:,.0f}")
+else:
+    # Mostrar dados zerados quando não há dados
+    with col1:
+        st.metric("📈 Total Leads", "0")
+    with col2:
+        st.metric("🎯 Vendas Ganhas", "0", "0% win rate")
+    with col3:
+        st.metric("❌ Vendas Perdidas", "0", "0% loss rate")
+    with col4:
+        st.metric("💰 Custo Total", "R$ 0,00")
 
 # SEÇÃO 2: MÓDULO 1 - ENTRADA E ORIGEM DE LEADS
 st.header("🎯 Módulo 1: Entrada e Origem de Leads")
@@ -113,11 +198,11 @@ leads_canal_query = f"""
 SELECT 
     COALESCE(primary_source, 'Não Classificado') as canal,
     COUNT(*) as total_leads,
-    AVG(response_time_hours) as tempo_resposta_medio,
+    AVG(CASE WHEN response_time_hours > 0 AND response_time_hours <= 48 THEN response_time_hours END) as tempo_resposta_medio,
     SUM(lead_cost) as custo_total,
     AVG(lead_cost) as custo_medio
 FROM leads_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY primary_source
 ORDER BY total_leads DESC
 """
@@ -197,8 +282,8 @@ st.subheader("📋 Detalhamento por Canal")
 if not leads_canal_df.empty:
     # Formatar dados para exibição
     canais_display = leads_canal_df.copy()
-    canais_display['tempo_resposta_medio'] = canais_display['tempo_resposta_medio'].round(1)
-    canais_display['custo_medio'] = canais_display['custo_medio'].round(2)
+    canais_display['tempo_resposta_medio'] = pd.to_numeric(canais_display['tempo_resposta_medio'], errors='coerce').round(1)
+    canais_display['custo_medio'] = pd.to_numeric(canais_display['custo_medio'], errors='coerce').round(2)
     canais_display['pct_total'] = (canais_display['total_leads'] / canais_display['total_leads'].sum() * 100).round(1)
     
     # Renomear colunas
@@ -227,7 +312,7 @@ SELECT
     SUM(lead_cost) as custo_total,
     AVG(lead_cost) as custo_medio
 FROM leads_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY primary_source
 ORDER BY total_leads DESC
 """
@@ -280,11 +365,11 @@ vendas_canal_query = f"""
 SELECT 
     lm.primary_source as canal,
     COUNT(DISTINCT fh.lead_id) as vendas_ganhas,
-    COUNT(DISTINCT CASE WHEN fh.status_name = 'Venda perdida' THEN fh.lead_id END) as vendas_perdidas
+    COUNT(DISTINCT CASE WHEN fh.status_name = 'Closed - lost' THEN fh.lead_id END) as vendas_perdidas
 FROM funnel_history fh
 JOIN leads_metrics lm ON fh.lead_id = lm.lead_id
 WHERE fh.entry_date >= '{data_inicio.date()}'
-AND fh.status_name IN ('Venda ganha', 'Venda perdida')
+AND fh.status_name IN ('Closed - won', 'Closed - lost')
 GROUP BY lm.primary_source
 ORDER BY vendas_ganhas DESC
 """
@@ -331,7 +416,7 @@ SELECT
     utm_campaign,
     COUNT(*) as total_leads
 FROM leads_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 AND utm_source IS NOT NULL
 GROUP BY utm_source, utm_medium, utm_campaign
 ORDER BY total_leads DESC
@@ -393,7 +478,7 @@ with col1:
     SELECT 
         COALESCE(fh.status_name, 'Desconhecido') as etapa,
         COUNT(DISTINCT fh.lead_id) as leads,
-        AVG(fh.time_in_status_hours) as tempo_medio
+        AVG(CASE WHEN fh.time_in_status_hours > 0 AND fh.time_in_status_hours <= 168 THEN fh.time_in_status_hours END) as tempo_medio
     FROM funnel_history fh
     WHERE fh.entry_date >= '{data_inicio.date()}'
     AND fh.pipeline_id = 11146887
@@ -493,11 +578,19 @@ with col2:
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    total_leads_principal = status_principal_df['leads_unicos'].sum() if not status_principal_df.empty else 0
+    # Query para contar leads únicos reais (sem duplicação entre status)
+    total_leads_query = f"""
+        SELECT COUNT(DISTINCT lead_id) as leads_unicos_totais
+        FROM funnel_history 
+        WHERE pipeline_id = 11146887
+        AND entry_date >= '{data_inicio.date()}'
+    """
+    total_leads_df = run_query(total_leads_query)
+    total_leads_principal = total_leads_df.iloc[0]['leads_unicos_totais'] if not total_leads_df.empty else 0
     st.metric("📊 Total Leads Principal", f"{total_leads_principal:,}")
 
 with col2:
-    vendas_principal = status_principal_df[status_principal_df['status_name'] == 'Venda ganha']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Venda ganha' in status_principal_df['status_name'].values else 0
+    vendas_principal = status_principal_df[status_principal_df['status_name'] == 'Closed - won']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Closed - won' in status_principal_df['status_name'].values else 0
     st.metric("✅ Vendas Ganhas", f"{vendas_principal:,}")
 
 with col3:
@@ -505,7 +598,7 @@ with col3:
     st.metric("⏱️ Tempo Médio Etapa", f"{tempo_medio_etapa:.1f}h")
 
 with col4:
-    vendas_perdidas_principal = status_principal_df[status_principal_df['status_name'] == 'Venda perdida']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Venda perdida' in status_principal_df['status_name'].values else 0
+    vendas_perdidas_principal = status_principal_df[status_principal_df['status_name'] == 'Closed - lost']['leads_unicos'].iloc[0] if not status_principal_df.empty and 'Closed - lost' in status_principal_df['status_name'].values else 0
     st.metric("❌ Vendas Perdidas", f"{vendas_perdidas_principal:,}")
 
 # SEÇÃO 3.5: ANÁLISE DE VENDAS PERDIDAS
@@ -529,7 +622,7 @@ with col1:
         AVG(time_in_status_hours) as tempo_medio
     FROM funnel_history 
     WHERE pipeline_id = 11146887
-    AND status_name = 'Venda perdida'
+    AND status_name = 'Closed - lost'
     AND entry_date >= '{data_inicio.date()}'
     GROUP BY tempo_categoria
     ORDER BY tempo_medio
@@ -555,7 +648,7 @@ with col2:
         AVG(time_in_status_hours) as tempo_medio
     FROM funnel_history 
     WHERE pipeline_id = 11146887
-    AND status_name IN ('Venda ganha', 'Venda perdida')
+    AND status_name IN ('Closed - won', 'Closed - lost')
     AND entry_date >= '{data_inicio.date()}'
     GROUP BY status_name
     """
@@ -575,11 +668,11 @@ with col2:
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    total_perdidas = comparacao_df[comparacao_df['status_name'] == 'Venda perdida']['leads'].iloc[0] if not comparacao_df.empty and 'Venda perdida' in comparacao_df['status_name'].values else 0
+    total_perdidas = comparacao_df[comparacao_df['status_name'] == 'Closed - lost']['leads'].iloc[0] if not comparacao_df.empty and 'Closed - lost' in comparacao_df['status_name'].values else 0
     st.metric("❌ Total Perdidas", f"{total_perdidas:,}")
 
 with col2:
-    total_ganhas = comparacao_df[comparacao_df['status_name'] == 'Venda ganha']['leads'].iloc[0] if not comparacao_df.empty and 'Venda ganha' in comparacao_df['status_name'].values else 0
+    total_ganhas = comparacao_df[comparacao_df['status_name'] == 'Closed - won']['leads'].iloc[0] if not comparacao_df.empty and 'Closed - won' in comparacao_df['status_name'].values else 0
     st.metric("✅ Total Ganhas", f"{total_ganhas:,}")
 
 with col3:
@@ -587,7 +680,7 @@ with col3:
     st.metric("📉 Taxa de Perda", f"{taxa_perda:.1f}%")
 
 with col4:
-    tempo_medio_perdidas = comparacao_df[comparacao_df['status_name'] == 'Venda perdida']['tempo_medio'].iloc[0] if not comparacao_df.empty and 'Venda perdida' in comparacao_df['status_name'].values else 0
+    tempo_medio_perdidas = comparacao_df[comparacao_df['status_name'] == 'Closed - lost']['tempo_medio'].iloc[0] if not comparacao_df.empty and 'Closed - lost' in comparacao_df['status_name'].values else 0
     st.metric("⏱️ Tempo até Perda", f"{tempo_medio_perdidas:.1f}h")
 
 # SEÇÃO 3.6: MOTIVOS DE PERDA
@@ -597,13 +690,14 @@ st.markdown("**Análise detalhada dos motivos de perda no funil**")
 # Buscar dados reais de motivos de perda
 motivos_perda_query = f"""
 SELECT 
-    COALESCE(loss_reason, 'Não especificado') as motivo,
+    COALESCE(loss_reason_name, 'Não especificado') as motivo,
     COUNT(DISTINCT lead_id) as leads_perdidos,
-    AVG(sales_cycle_days) as tempo_medio
-FROM sales_metrics 
-WHERE created_date >= '{data_inicio.date()}'
-AND status_name = 'Venda perdida'
-GROUP BY loss_reason
+    AVG(time_in_status_hours) as tempo_medio
+FROM funnel_history 
+WHERE entry_date >= '{data_inicio.date()}'
+AND pipeline_id = 11146887
+AND status_name = 'Closed - lost'
+GROUP BY loss_reason_name
 ORDER BY leads_perdidos DESC
 """
 
@@ -667,7 +761,7 @@ st.subheader("📋 Detalhamento dos Motivos de Perda")
 if not motivos_perda_df.empty:
     # Formatar dados para exibição
     motivos_display = motivos_perda_df.copy()
-    motivos_display['tempo_medio'] = motivos_display['tempo_medio'].round(1)
+    motivos_display['tempo_medio'] = pd.to_numeric(motivos_display['tempo_medio'], errors='coerce').round(1)
     motivos_display['pct_total'] = (motivos_display['leads_perdidos'] / motivos_display['leads_perdidos'].sum() * 100).round(1)
     
     # Renomear colunas
@@ -704,7 +798,7 @@ SELECT
     ROUND(COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
     COUNT(DISTINCT entity_id) as leads_contatatados
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY activity_type 
 ORDER BY total_atividades DESC
 """
@@ -776,7 +870,7 @@ SELECT
     ROUND(COUNT(CASE WHEN is_completed = 1 OR is_successful = 1 OR completed_at IS NOT NULL THEN 1 END) / COUNT(*) * 100, 1) as taxa_conclusao,
     COUNT(DISTINCT entity_id) as leads_diferentes
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY user_name, user_role 
 ORDER BY total_atividades DESC
 LIMIT 10
@@ -794,7 +888,7 @@ SELECT
     COUNT(CASE WHEN follow_up_category = 'baixa_prioridade' THEN 1 END) as baixa_prioridade,
     AVG(urgency_score) as score_medio_urgencia
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}' AND is_follow_up = 1
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}' AND is_follow_up = 1
 GROUP BY user_name
 """
 
@@ -808,7 +902,7 @@ SELECT
     COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till >= created_date THEN 1 END) as followups_no_prazo,
     COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till < created_date THEN 1 END) as followups_atrasados
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY user_name
 """
 
@@ -972,7 +1066,7 @@ SELECT
     activity_type,
     COUNT(*) as atividades
 FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY DATE(created_datetime), activity_type
 ORDER BY data DESC
 LIMIT 50
@@ -1005,7 +1099,7 @@ SELECT
     AVG(sale_price) as ticket_medio,
     AVG(sales_cycle_days) as ciclo_medio_dias
 FROM sales_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY status_name, status_type
 ORDER BY total_leads DESC
 """
@@ -1055,7 +1149,7 @@ SELECT
                  COUNT(CASE WHEN status_name = 'Venda perdida' THEN 1 END), 0) * 100, 1) as win_rate,
     ROUND(AVG(CASE WHEN status_name = 'Venda ganha' THEN sales_cycle_days END), 1) as ciclo_medio
 FROM sales_metrics 
-WHERE created_date >= '{data_inicio.date()}'
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 GROUP BY responsible_user_name, responsible_user_role
 ORDER BY vendas_fechadas DESC
 LIMIT 10
@@ -1196,83 +1290,57 @@ if not conversoes_temporais_df.empty:
     
     st.plotly_chart(fig_temporal, width='stretch')
 
-# Insights e alertas de conversão
-st.subheader("💡 Insights de Conversão")
-
-if not vendas_df.empty:
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if win_rate < 10:
-            st.error(f"🚨 **CRÍTICO**: Win Rate de apenas {win_rate:.1f}%. Meta: >20%")
-        elif win_rate < 20:
-            st.warning(f"⚠️ **BAIXO**: Win Rate de {win_rate:.1f}%. Melhorar qualificação!")
-        else:
-            st.success(f"✅ **BOM**: Win Rate de {win_rate:.1f}%")
-    
-    with col2:
-        if ticket_medio < 1000:
-            st.warning(f"⚠️ **BAIXO**: Ticket médio R$ {ticket_medio:.0f}. Focar em up-sell!")
-        else:
-            st.success(f"✅ **BOM**: Ticket médio R$ {ticket_medio:.0f}")
-    
-    with col3:
-        if ciclo_medio > 30:
-            st.warning(f"⚠️ **LONGO**: Ciclo de {ciclo_medio:.0f} dias. Acelerar processo!")
-        else:
-            st.success(f"✅ **BOM**: Ciclo de {ciclo_medio:.0f} dias")
+# Insights de conversão removidos conforme solicitado
 
 # SEÇÃO 6: MÓDULO 5 - PERFORMANCE POR PESSOA E CANAL
 st.header("🏆 Módulo 5: Performance por Pessoa e Canal")
 st.markdown("**Para gestão e tomada de decisão: rankings de vendedores e análise de canais mais qualificados**")
 
-# Buscar dados de performance de vendedores
+# Buscar dados de performance de vendedores (usando dados da API do Kommo)
 performance_vendedores_query = f"""
 SELECT 
     user_name,
     user_role,
-    SUM(total_leads) as total_leads,
-    SUM(vendas_fechadas) as vendas_fechadas,
-    SUM(vendas_perdidas) as vendas_perdidas,
-    SUM(receita_total) as receita_total,
-    AVG(win_rate) as win_rate,
-    AVG(conversion_rate) as conversion_rate,
-    AVG(ticket_medio) as ticket_medio,
-    AVG(tempo_resposta_medio) as tempo_resposta_medio,
-    AVG(ciclo_vendas_medio) as ciclo_vendas_medio,
-    SUM(total_atividades) as total_atividades,
-    SUM(atividades_concluidas) as atividades_concluidas,
-    SUM(leads_contactados) as leads_contactados,
-    AVG(taxa_conclusao_atividades) as taxa_conclusao_atividades
+    total_leads,
+    vendas_fechadas,
+    vendas_perdidas,
+    receita_total,
+    win_rate,
+    conversion_rate,
+    ticket_medio,
+    tempo_resposta_medio,
+    ciclo_vendas_medio,
+    total_atividades,
+    atividades_concluidas,
+    leads_contactados,
+    taxa_conclusao_atividades
 FROM performance_vendedores 
-WHERE created_date >= '{data_inicio.date()}'
-GROUP BY user_name, user_role
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 ORDER BY receita_total DESC
 """
 
 performance_vendedores_df = run_query(performance_vendedores_query)
 
-# Buscar dados de performance de canais
+# Buscar dados de performance por canal (usando dados da API do Kommo)
 performance_canais_query = f"""
 SELECT 
     canal_origem,
     utm_source,
     utm_medium,
-    SUM(total_leads) as total_leads,
-    SUM(vendas_fechadas) as vendas_fechadas,
-    SUM(vendas_perdidas) as vendas_perdidas,
-    SUM(receita_total) as receita_total,
-    SUM(custo_total) as custo_total,
-    AVG(win_rate) as win_rate,
-    AVG(conversion_rate) as conversion_rate,
-    AVG(ticket_medio) as ticket_medio,
-    AVG(custo_por_lead) as custo_por_lead,
-    AVG(roi) as roi,
-    AVG(tempo_resposta_medio) as tempo_resposta_medio,
-    AVG(ciclo_vendas_medio) as ciclo_vendas_medio
+    total_leads,
+    vendas_fechadas,
+    vendas_perdidas,
+    receita_total,
+    custo_total,
+    win_rate,
+    conversion_rate,
+    ticket_medio,
+    custo_por_lead,
+    roi,
+    tempo_resposta_medio,
+    ciclo_vendas_medio
 FROM performance_canais 
-WHERE created_date >= '{data_inicio.date()}'
-GROUP BY canal_origem, utm_source, utm_medium
+WHERE created_date >= '{data_inicio.date()}' AND created_date <= '{data_fim.date()}'
 ORDER BY receita_total DESC
 """
 
@@ -1281,7 +1349,7 @@ performance_canais_df = run_query(performance_canais_query)
 # Métricas principais do Módulo 5
 col1, col2, col3, col4 = st.columns(4)
 
-if not performance_vendedores_df.empty and not performance_canais_df.empty:
+if not performance_vendedores_df.empty and not performance_canais_df.empty and tem_dados:
     top_vendedor = performance_vendedores_df.iloc[0]
     top_canal = performance_canais_df.iloc[0]
     total_vendedores = performance_vendedores_df['user_name'].nunique()
@@ -1298,11 +1366,21 @@ if not performance_vendedores_df.empty and not performance_canais_df.empty:
     
     with col4:
         st.metric("📈 Canais", f"{total_canais}")
+else:
+    # Mostrar dados zerados quando não há dados
+    with col1:
+        st.metric("👑 Top Vendedor", "Sem dados", "R$ 0")
+    with col2:
+        st.metric("🏆 Top Canal", "Sem dados", "R$ 0")
+    with col3:
+        st.metric("👥 Vendedores", "0")
+    with col4:
+        st.metric("📈 Canais", "0")
 
 # Performance de Vendedores
 st.subheader("👥 Ranking de Vendedores")
 
-if not performance_vendedores_df.empty:
+if not performance_vendedores_df.empty and tem_dados:
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1392,11 +1470,13 @@ if not performance_vendedores_df.empty:
                 labels={'win_rate': 'Win Rate (%)', 'ticket_medio': 'Ticket Médio (R$)'}
             )
             st.plotly_chart(fig_scatter, width='stretch')
+else:
+    st.info("📊 **Nenhum dado de performance de vendedores encontrado para o período selecionado.**")
 
 # Performance de Canais
 st.subheader("📈 Análise de Canais")
 
-if not performance_canais_df.empty:
+if not performance_canais_df.empty and tem_dados:
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1493,390 +1573,9 @@ with col2:
             'roi': 'ROI (%)'
         })
         st.dataframe(top_canais_display, width='stretch')
-
-# SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST)
-st.header("🔮 Módulo 6: Previsibilidade (Forecast)")
-st.markdown("**Forecast de receita (previsto vs. realizado) para antecipar gargalos antes de fechar o mês**")
-
-# Buscar forecast baseado nos dados dos Módulos 1 a 5
-forecast_query = f"""
-SELECT 
-    mes_ano,
-    data_previsao,
-    meta_receita,
-    previsao_receita,
-    previsao_leads,
-    previsao_win_rate,
-    previsao_ticket_medio
-FROM monthly_forecasts 
-WHERE mes_ano = DATE_FORMAT('{selected_date}', '%Y-%m')
-ORDER BY data_previsao DESC
-LIMIT 1
-"""
-
-forecast_df = run_query(forecast_query)
-
-# Buscar resultados reais baseados nos dados dos Módulos 1 a 5
-results_query = f"""
-SELECT 
-    DATE_FORMAT('{selected_date}', '%Y-%m') as mes_ano,
-    NOW() as data_atualizacao,
-    SUM(CASE WHEN sm.status_name = 'Venda ganha' THEN sm.sale_price ELSE 0 END) as receita_realizada,
-    COUNT(DISTINCT l.lead_id) as leads_realizados,
-    COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) as vendas_fechadas,
-    COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda perdida' THEN sm.lead_id END) as vendas_perdidas,
-    ROUND(COUNT(DISTINCT CASE WHEN sm.status_name = 'Venda ganha' THEN sm.lead_id END) / 
-          NULLIF(COUNT(DISTINCT CASE WHEN sm.status_name IN ('Venda ganha', 'Venda perdida') THEN sm.lead_id END), 0) * 100, 1) as win_rate_real,
-    AVG(CASE WHEN sm.status_name = 'Venda ganha' THEN sm.sale_price END) as ticket_medio_real,
-    DATEDIFF('{selected_date}', DATE_FORMAT('{selected_date}', '%Y-%m-01')) + 1 as dias_passados,
-    DATEDIFF(LAST_DAY('{selected_date}'), '{selected_date}') as dias_restantes
-FROM leads_metrics l
-LEFT JOIN sales_metrics sm ON l.lead_id = sm.lead_id
-WHERE l.created_date >= DATE_FORMAT('{selected_date}', '%Y-%m-01')
-AND l.created_date <= LAST_DAY('{selected_date}')
-"""
-
-results_df = run_query(results_query)
-
-# Buscar gaps e gargalos baseados nos dados dos Módulos 1 a 5
-gaps_query = f"""
-SELECT 
-    mes_ano,
-    data_analise,
-    gap_receita,
-    gap_leads,
-    gap_win_rate,
-    gap_ticket_medio,
-    receita_necessaria_diaria,
-    leads_necessarios_diarios,
-    win_rate_necessario,
-    ticket_medio_necessario,
-    risco_meta,
-    alertas,
-    acoes_recomendadas
-FROM forecast_gaps 
-WHERE mes_ano = DATE_FORMAT('{selected_date}', '%Y-%m')
-ORDER BY data_analise DESC
-LIMIT 1
-"""
-
-gaps_df = run_query(gaps_query)
-
-# Métricas principais do Módulo 6 - Forecast vs Realizado
-col1, col2, col3, col4 = st.columns(4)
-
-if not forecast_df.empty and not results_df.empty:
-    forecast = forecast_df.iloc[0]
-    results = results_df.iloc[0]
-    
-    # Verificar se os valores não são None e definir valores padrão
-    meta_receita = forecast.get('meta_receita', 0) or 0
-    receita_realizada = results.get('receita_realizada', 0) or 0
-    win_rate_real = results.get('win_rate_real', 0) or 0
-    previsao_win_rate = forecast.get('previsao_win_rate', 0) or 0
-    dias_restantes = results.get('dias_restantes', 0) or 0
-    dias_passados = results.get('dias_passados', 0) or 0
-    
-    with col1:
-        st.metric(
-            "🎯 Meta Receita", 
-            f"R$ {meta_receita:,.0f}", 
-            f"vs R$ {receita_realizada:,.0f} realizado"
-        )
-    
-    with col2:
-        gap_receita = meta_receita - receita_realizada
-        gap_percentual = (gap_receita/meta_receita)*100 if meta_receita > 0 else 0
-        st.metric(
-            "📊 Gap Receita", 
-            f"R$ {gap_receita:,.0f}", 
-            f"{gap_percentual:.1f}% da meta"
-        )
-    
-    with col3:
-        st.metric(
-            "📈 Win Rate", 
-            f"{win_rate_real:.1f}%", 
-            f"vs {previsao_win_rate:.1f}% previsto"
-        )
-    
-    with col4:
-        st.metric(
-            "⏰ Dias Restantes", 
-            f"{dias_restantes}", 
-            f"de {dias_passados} passados"
-        )
-else:
-    # Mostrar mensagem quando não há dados
-    with col1:
-        st.metric("🎯 Meta Receita", "R$ 0", "Sem dados")
-    with col2:
-        st.metric("📊 Gap Receita", "R$ 0", "Sem dados")
-    with col3:
-        st.metric("📈 Win Rate", "0.0%", "Sem dados")
-    with col4:
-        st.metric("⏰ Dias Restantes", "0", "Sem dados")
-
-# Análise de Gaps e Gargalos
-st.subheader("⚠️ Análise de Gaps para Fechamento do Mês")
-
-if not gaps_df.empty:
-    gaps = gaps_df.iloc[0]
-    
-    # Verificar se os valores não são None e definir valores padrão
-    risco_meta = gaps.get('risco_meta', 'baixo') or 'baixo'
-    alertas = gaps.get('alertas', 'Sem dados') or 'Sem dados'
-    acoes_recomendadas = gaps.get('acoes_recomendadas', 'Sem dados') or 'Sem dados'
-    receita_necessaria_diaria = gaps.get('receita_necessaria_diaria', 0) or 0
-    leads_necessarios_diarios = gaps.get('leads_necessarios_diarios', 0) or 0
-    win_rate_necessario = gaps.get('win_rate_necessario', 0) or 0
-    ticket_medio_necessario = gaps.get('ticket_medio_necessario', 0) or 0
-    
-    # Alertas de risco
-    risco_color = {
-        'baixo': 'green',
-        'medio': 'orange', 
-        'alto': 'red',
-        'critico': 'darkred'
-    }
-    
-    st.markdown(f"""
-    <div style="padding: 1rem; border-radius: 0.5rem; background-color: {risco_color.get(risco_meta, 'gray')}; color: white;">
-        <h4>🚨 Risco da Meta: {risco_meta.upper()}</h4>
-        <p><strong>Alertas:</strong> {alertas}</p>
-        <p><strong>Ações Recomendadas:</strong> {acoes_recomendadas}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Métricas de gap
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric(
-            "💰 Receita Necessária/Dia",
-            f"R$ {receita_necessaria_diaria:,.0f}",
-            f"para atingir meta"
-        )
-    
-    with col2:
-        st.metric(
-            "📊 Leads Necessários/Dia",
-            f"{leads_necessarios_diarios:.0f}",
-            f"para atingir meta"
-        )
-    
-    with col3:
-        st.metric(
-            "🎯 Win Rate Necessário",
-            f"{win_rate_necessario:.1f}%",
-            f"para atingir meta"
-        )
-    
-    with col4:
-        st.metric(
-            "💎 Ticket Médio Necessário",
-            f"R$ {ticket_medio_necessario:,.0f}",
-            f"para atingir meta"
-        )
-else:
-    st.warning("⚠️ Não há dados de gaps disponíveis para o período selecionado.")
-
-# Comparação Previsto vs Realizado
-st.subheader("📊 Comparação Previsto vs Realizado")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    if not forecast_df.empty and not results_df.empty:
-        forecast = forecast_df.iloc[0]
-        results = results_df.iloc[0]
-        
-        # Verificar se os valores não são None e definir valores padrão
-        meta_receita = forecast.get('meta_receita', 0) or 0
-        previsao_receita = forecast.get('previsao_receita', 0) or 0
-        receita_realizada = results.get('receita_realizada', 0) or 0
-        
-        # Gráfico de barras comparativo
-        fig_comparativo = go.Figure()
-        
-        # Receita
-        fig_comparativo.add_trace(go.Bar(
-            name='Meta',
-            x=['Receita'],
-            y=[meta_receita],
-            marker_color='red'
-        ))
-        
-        fig_comparativo.add_trace(go.Bar(
-            name='Previsto',
-            x=['Receita'],
-            y=[previsao_receita],
-            marker_color='orange'
-        ))
-        
-        fig_comparativo.add_trace(go.Bar(
-            name='Realizado',
-            x=['Receita'],
-            y=[receita_realizada],
-            marker_color='green'
-        ))
-        
-        fig_comparativo.update_layout(
-            title="💰 Receita: Meta vs Previsto vs Realizado",
-            yaxis_title="Valor (R$)",
-            barmode='group'
-        )
-        
-        st.plotly_chart(fig_comparativo, width='stretch')
     else:
-        st.warning("⚠️ Não há dados suficientes para gerar o gráfico de comparação.")
-    
-    with col2:
-        if not forecast_df.empty and not results_df.empty:
-            forecast = forecast_df.iloc[0]
-            results = results_df.iloc[0]
-            
-            # Verificar se os valores não são None e definir valores padrão
-            previsao_win_rate = forecast.get('previsao_win_rate', 0) or 0
-            win_rate_real = results.get('win_rate_real', 0) or 0
-            previsao_ticket_medio = forecast.get('previsao_ticket_medio', 0) or 0
-            ticket_medio_real = results.get('ticket_medio_real', 0) or 0
-            
-            # Gráfico de Win Rate e Ticket Médio
-            fig_metrics = go.Figure()
-            
-            # Win Rate
-            fig_metrics.add_trace(go.Bar(
-                name='Win Rate Previsto',
-                x=['Win Rate'],
-                y=[previsao_win_rate],
-                marker_color='lightblue'
-            ))
-            
-            fig_metrics.add_trace(go.Bar(
-                name='Win Rate Real',
-                x=['Win Rate'],
-                y=[win_rate_real],
-                marker_color='blue'
-            ))
-            
-            # Ticket Médio
-            fig_metrics.add_trace(go.Bar(
-                name='Ticket Previsto',
-                x=['Ticket Médio'],
-                y=[previsao_ticket_medio],
-                marker_color='lightgreen'
-            ))
-            
-            fig_metrics.add_trace(go.Bar(
-                name='Ticket Real',
-                x=['Ticket Médio'],
-                y=[ticket_medio_real],
-                marker_color='green'
-            ))
-            
-            fig_metrics.update_layout(
-                title="📊 Win Rate e Ticket Médio: Previsto vs Realizado",
-                yaxis_title="Valor (%) / (R$)",
-                barmode='group'
-            )
-            
-            st.plotly_chart(fig_metrics, width='stretch')
+        st.info("📊 **Nenhum dado de performance de canais encontrado para o período selecionado.**")
 
-# Resumo Executivo do Forecast
-st.subheader("📋 Resumo Executivo do Forecast")
-
-if not forecast_df.empty and not results_df.empty and not gaps_df.empty:
-    forecast = forecast_df.iloc[0]
-    results = results_df.iloc[0]
-    gaps = gaps_df.iloc[0]
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**🎯 METAS E PREVISÕES:**")
-        st.markdown(f"- **Meta de Receita:** R$ {forecast.get('meta_receita', 0) or 0:,.2f}")
-        st.markdown(f"- **Previsão de Receita:** R$ {forecast.get('previsao_receita', 0) or 0:,.2f}")
-        st.markdown(f"- **Previsão de Leads:** {forecast.get('previsao_leads', 0) or 0:,}")
-        st.markdown(f"- **Win Rate Esperado:** {forecast.get('previsao_win_rate', 0) or 0:.1f}%")
-        st.markdown(f"- **Ticket Médio Esperado:** R$ {forecast.get('previsao_ticket_medio', 0) or 0:,.2f}")
-    
-    with col2:
-        st.markdown("**📊 RESULTADOS ATUAIS:**")
-        st.markdown(f"- **Receita Realizada:** R$ {results.get('receita_realizada', 0) or 0:,.2f}")
-        st.markdown(f"- **Leads Realizados:** {results.get('leads_realizados', 0) or 0:,}")
-        st.markdown(f"- **Vendas Fechadas:** {results.get('vendas_fechadas', 0) or 0}")
-        st.markdown(f"- **Win Rate Real:** {results.get('win_rate_real', 0) or 0:.1f}%")
-        st.markdown(f"- **Ticket Médio Real:** R$ {results.get('ticket_medio_real', 0) or 0:,.2f}")
-        st.markdown(f"- **Dias Restantes:** {results.get('dias_restantes', 0) or 0}")
-
-# Análise de Performance
-st.subheader("📈 Análise de Performance")
-
-if not gaps_df.empty:
-    gaps = gaps_df.iloc[0]
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**📊 GAPS IDENTIFICADOS:**")
-        st.markdown(f"- **Gap de Receita:** R$ {gaps.get('gap_receita', 0) or 0:,.2f}")
-        st.markdown(f"- **Gap de Leads:** {gaps.get('gap_leads', 0) or 0}")
-        st.markdown(f"- **Gap de Win Rate:** {gaps.get('gap_win_rate', 0) or 0:.1f}%")
-        st.markdown(f"- **Gap de Ticket Médio:** R$ {gaps.get('gap_ticket_medio', 0) or 0:,.2f}")
-    
-    with col2:
-        st.markdown("**🎯 NECESSIDADES PARA ATINGIR META:**")
-        st.markdown(f"- **Receita/Dia:** R$ {gaps.get('receita_necessaria_diaria', 0) or 0:,.0f}")
-        st.markdown(f"- **Leads/Dia:** {gaps.get('leads_necessarios_diarios', 0) or 0:.0f}")
-        st.markdown(f"- **Win Rate:** {gaps.get('win_rate_necessario', 0) or 0:.1f}%")
-        st.markdown(f"- **Ticket Médio:** R$ {gaps.get('ticket_medio_necessario', 0) or 0:,.0f}")
-
-# Alertas Automáticos
-st.subheader("🚨 Alertas Automáticos")
-
-if not gaps_df.empty:
-    gaps = gaps_df.iloc[0]
-    
-    if gaps.get('risco_meta') == 'critico':
-        st.error("🚨 **ALERTA CRÍTICO**: Risco alto de não atingir a meta! Ações imediatas necessárias.")
-    elif gaps.get('risco_meta') == 'alto':
-        st.warning("⚠️ **ALERTA ALTO**: Risco moderado de não atingir a meta. Acompanhamento intensivo necessário.")
-    elif gaps.get('risco_meta') == 'medio':
-        st.info("ℹ️ **ALERTA MÉDIO**: Risco baixo, mas atenção aos gaps identificados.")
-    else:
-        st.success("✅ **STATUS OK**: Meta em dia, mantendo performance atual.")
-
-# Buscar dados de segmentação dos follow-ups para integrar na tabela principal
-followup_segmentation_query = f"""
-SELECT 
-    user_name,
-    COUNT(*) as total_followups,
-    COUNT(CASE WHEN follow_up_category = 'alta_prioridade' THEN 1 END) as alta_prioridade,
-    COUNT(CASE WHEN follow_up_category = 'media_prioridade' THEN 1 END) as media_prioridade,
-    COUNT(CASE WHEN follow_up_category = 'baixa_prioridade' THEN 1 END) as baixa_prioridade,
-    AVG(urgency_score) as score_medio_urgencia
-FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}' AND is_follow_up = 1
-GROUP BY user_name
-"""
-
-followup_segmentation_df = run_query(followup_segmentation_query)
-
-# Buscar dados de taxa de resposta e follow-ups no prazo
-response_metrics_query = f"""
-SELECT 
-    user_name,
-    COUNT(CASE WHEN activity_type = 'note' AND note_text LIKE '%resposta%' OR note_text LIKE '%retorno%' THEN 1 END) as respostas_recebidas,
-    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till >= created_date THEN 1 END) as followups_no_prazo,
-    COUNT(CASE WHEN activity_type = 'task' AND is_follow_up = 1 AND complete_till IS NOT NULL AND complete_till < created_date THEN 1 END) as followups_atrasados
-FROM commercial_activities 
-WHERE created_date >= '{data_inicio.date()}'
-GROUP BY user_name
-"""
-
-response_metrics_df = run_query(response_metrics_query)
-
-
-
-
+# SEÇÃO 7: MÓDULO 6 - PREVISIBILIDADE (FORECAST) - API KOMMO
+from modulo6_forecast_mensal import render_modulo6_forecast_mensal
+render_modulo6_forecast_mensal()
